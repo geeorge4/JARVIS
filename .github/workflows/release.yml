@@ -1,0 +1,39 @@
+name: Build and publish
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Python sources
+        run: python -m compileall -q . -x '(dist|\.git)'
+      - name: Build offline installer
+        run: python installer/build.py
+      - name: Run checks
+        run: python -m unittest discover -s tests -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-Windows
+          path: dist/*
+      - name: Publish versioned release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = (Get-Content dist/release.json -Raw | ConvertFrom-Json).version
+          $tag = 'v' + $version
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Output "Release $tag already exists; keeping published assets unchanged."
+            exit 0
+          }
+          gh release create $tag dist/InstallUpdates.exe dist/JARVIS.exe dist/jarvis-app.zip dist/SHA256SUMS.txt dist/release.json --target $env:GITHUB_SHA --title "JARVIS $version" --notes 'Offline application installer. Python, dependencies and models are separate; see README. Personal settings and audio are not included.'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

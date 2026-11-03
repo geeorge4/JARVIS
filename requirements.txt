@@ -1,0 +1,12 @@
+# JARVIS 2.3.0 — Python 3.12, Windows x64
+# Python packages only. Ollama, Qwen, Whisper and Piper voice models are separate.
+# tkinter, ctypes, json, urllib and winsound belong to Python / Windows.
+numpy==2.5.4
+sounddevice==0.5.6
+faster-whisper==1.2.1
+piper-tts==1.8.0
+pystray==0.19.5
+Pillow==13.0.0
+pywin32==312
+AppOpener==1.7
+psutil==7.2.2

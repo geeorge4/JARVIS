@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360">
+<defs><radialGradient id="g"><stop stop-color="#173b50"/><stop offset="1" stop-color="#0c111b"/></radialGradient><linearGradient id="t"><stop stop-color="#b5edff"/><stop offset="1" stop-color="#678af3"/></linearGradient></defs>
+<rect width="1200" height="360" rx="24" fill="#0c111b"/>
+<circle cx="225" cy="175" r="140" fill="url(#g)"/>
+<g fill="none" stroke="#58b5dd"><circle cx="225" cy="175" r="100" stroke-opacity=".5"/><ellipse cx="225" cy="175" rx="100" ry="35"/><ellipse cx="225" cy="175" rx="35" ry="100"/><ellipse cx="225" cy="175" rx="70" ry="100" transform="rotate(40 225 175)"/><ellipse cx="225" cy="175" rx="70" ry="100" transform="rotate(-40 225 175)"/><circle cx="225" cy="175" r="120" stroke-dasharray="75 35" stroke-opacity=".3"/></g>
+<text x="420" y="162" font-family="Segoe UI,Arial,sans-serif" font-size="74" font-weight="700" letter-spacing="12" fill="url(#t)">JARVIS</text>
+<text x="425" y="211" font-family="Segoe UI,Arial,sans-serif" font-size="23" fill="#a9b7cd">YOUR DESKTOP. YOUR VOICE. YOUR GAME.</text>
+<text x="425" y="259" font-family="Segoe UI,Arial,sans-serif" font-size="17" fill="#6c819e">WINDOWS  ·  LOCAL AI  ·  GAMING COMPANION  ·  MIT</text>
+</svg>

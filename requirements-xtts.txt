@@ -1,0 +1,4 @@
+# Optional isolated XTTS trial, Python 3.12 Windows
+# Install CPU PyTorch first: pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+coqui-tts==0.28.0
+transformers==4.57.6
