@@ -7,8 +7,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Windows.Forms;
 
-// Offline file installer. No network access, PowerShell, downloaded commands,
-// scheduled tasks, Defender changes, registry autorun or automatic elevation.
+// Application payload and optional components selected by the user.
 internal static class Installer
 {
     internal static byte[] Payload()
@@ -93,27 +92,60 @@ internal static class Installer
                 Install(test, files); return 0;
             }
             Application.EnableVisualStyles();
-            Form window = new Form { Text = "JARVIS · Install & Updates", ClientSize = new Size(660, 430), StartPosition = FormStartPosition.CenterScreen, BackColor = Color.FromArgb(18, 23, 32), ForeColor = Color.White, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false };
+            Form window = new Form { Text = "JARVIS · Install & Updates", ClientSize = new Size(660, 565), StartPosition = FormStartPosition.CenterScreen, BackColor = Color.FromArgb(18, 23, 32), ForeColor = Color.White, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false };
             window.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             Label title = new Label { Text = "J A R V I S", Font = new Font("Segoe UI", 29, FontStyle.Bold), AutoSize = true, Location = new Point(30, 24) };
-            Label info = new Label { Text = "Локальная установка / обновление файлов приложения\nБез загрузок из интернета и изменения защиты Windows.", Font = new Font("Segoe UI", 11), AutoSize = true, Location = new Point(34, 95) };
+            Label info = new Label { Text = "Локальная установка / обновление файлов приложения\nОтметьте компоненты. Для загрузок нужен интернет.", Font = new Font("Segoe UI", 11), AutoSize = true, Location = new Point(34, 95) };
             string existing = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "JARVISASSISTENT");
             string normal = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "JARVISASSISTENT");
             TextBox pathBox = new TextBox { Text = Directory.Exists(existing) ? existing : normal, Location = new Point(34, 165), Width = 495, Font = new Font("Segoe UI", 10) };
             Button browse = new Button { Text = "Папка…", Location = new Point(538, 163), Size = new Size(85, 30) };
             browse.Click += delegate { using (FolderBrowserDialog dialog = new FolderBrowserDialog()) { dialog.SelectedPath = pathBox.Text; if (dialog.ShowDialog(window) == DialogResult.OK) pathBox.Text = dialog.SelectedPath; } };
-            Label note = new Label { Text = "Сначала закройте JARVIS через значок в трее → Выйти.\nНастройки, память, модели и собственная музыка сохраняются.\nНа новом ПК Python, библиотеки и модели нужны отдельно: README.\nДля Program Files Windows может потребовать запуск от администратора.", Font = new Font("Segoe UI", 10), AutoSize = true, Location = new Point(34, 215) };
-            Label status = new Label { Text = "Пакет проверен: " + files.Count + " файлов. Сеть не используется.", Font = new Font("Segoe UI", 9), AutoSize = false, Size = new Size(585, 40), Location = new Point(34, 310), ForeColor = Color.LightSkyBlue };
-            Button install = new Button { Text = "Установить / обновить", Location = new Point(34, 365), Size = new Size(230, 36), BackColor = Color.FromArgb(56, 96, 145), FlatStyle = FlatStyle.Flat };
+            string adjacent = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "round-drops");
+            string anthemSource = Directory.Exists(adjacent) ? adjacent : Path.Combine(existing, "round-drops");
+            var python = new CheckBox { Text = "Python 3.12 и библиотеки", Checked = true, AutoSize = true, Location = new Point(34, 210) };
+            var ollama = new CheckBox { Text = "Ollama", Checked = true, AutoSize = true, Location = new Point(34, 240) };
+            var model = new CheckBox { Text = "Qwen для локального чата (несколько ГБ)", Checked = true, AutoSize = true, Location = new Point(34, 270) };
+            var voice = new CheckBox { Text = "Голос Дениса и распознавание Whisper", Checked = true, AutoSize = true, Location = new Point(34, 300) };
+            var anthems = new CheckBox { Text = "Мои гимны из локальной папки round-drops", Checked = Directory.Exists(anthemSource), Enabled = Directory.Exists(anthemSource), AutoSize = true, Location = new Point(34, 330) };
+            Label note = new Label { Text = "Перед обновлением закройте JARVIS через трей.\nДля Python и Ollama используется Windows Package Manager.\nГимны берутся из папки рядом с EXE или текущей установки.", AutoSize = true, Location = new Point(34, 375) };
+            Label status = new Label { Text = "Пакет приложения проверен.", Size = new Size(585, 38), Location = new Point(34, 438), ForeColor = Color.LightSkyBlue };
+            Button install = new Button { Text = "Установить / обновить", Location = new Point(34, 495), Size = new Size(230, 36), BackColor = Color.FromArgb(56, 96, 145), FlatStyle = FlatStyle.Flat };
+            bool busy = false;
+            window.FormClosing += delegate(object sender, FormClosingEventArgs eventArgs) { if (busy) eventArgs.Cancel = true; };
             install.Click += delegate
             {
-                try { install.Enabled = false; Install(pathBox.Text, files); status.Text = "Готово. Запускайте JARVIS.exe из выбранной папки."; }
-                catch (Exception error) { MessageBox.Show(window, "Установка не завершена: " + error.Message + "\nЗакройте JARVIS и проверьте права на выбранную папку.", "JARVIS", MessageBoxButtons.OK, MessageBoxIcon.Error); }
-                finally { install.Enabled = true; }
+                string root = pathBox.Text;
+                bool setupPython = python.Checked, setupOllama = ollama.Checked, setupModel = model.Checked, setupVoice = voice.Checked, importAnthems = anthems.Checked;
+                busy = true;
+                install.Enabled = false;
+                status.Text = "Устанавливаю файлы JARVIS…";
+                var worker = new System.ComponentModel.BackgroundWorker();
+                worker.DoWork += delegate
+                {
+                    Install(root, files);
+                    Components.Setup(root, setupPython, setupOllama, setupModel, setupVoice,
+                        message => window.BeginInvoke(new Action(() => status.Text = message)));
+                    if (importAnthems) Components.ImportAnthems(root, anthemSource);
+                };
+                worker.RunWorkerCompleted += delegate(object sender, System.ComponentModel.RunWorkerCompletedEventArgs result)
+                {
+                    busy = false;
+                    install.Enabled = true;
+                    if (result.Error == null) status.Text = "Готово. Запускайте JARVIS.exe из выбранной папки.";
+                    else
+                    {
+                        status.Text = "Установка прервана. Готовые компоненты сохранены.";
+                        MessageBox.Show(window, result.Error.Message, "JARVIS", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    worker.Dispose();
+                };
+                worker.RunWorkerAsync();
             };
-            window.Controls.AddRange(new Control[] { title, info, pathBox, browse, note, status, install });
+            window.Controls.AddRange(new Control[] { title, info, pathBox, browse, python, ollama, model, voice, anthems, note, status, install });
             Application.Run(window); return 0;
         }
         catch (Exception error) { if (args.Length == 0) MessageBox.Show(error.Message, "JARVIS package error"); return 1; }
     }
 }
+

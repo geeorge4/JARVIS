@@ -5,10 +5,10 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.3.0'
-CHANGES = ('Публичная версия проекта с MIT License и новым README.\n'
-           'Автономный InstallUpdates.exe: установка и обновление файлов приложения.\n'
-           'Пользовательские настройки, модели и своя музыка сохраняются.')
+VERSION = '2.3.1'
+CHANGES = ('Установка Python, Ollama, Qwen, Дениса и Whisper по галочкам.\n'
+           'Мастер подхватывает локальный набор гимнов.\n'
+           'Готовые настройки и существующие аудиофайлы сохраняются.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():
@@ -69,3 +69,4 @@ def whats_new(parent, force=False):
         window.destroy()
     tk.Button(window,text='Понятно',command=close).pack(pady=15)
     window.protocol('WM_DELETE_WINDOW',close)
+

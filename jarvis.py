@@ -16,6 +16,13 @@ API_URL = 'http://127.0.0.1:11435/api/chat'
 MODEL = 'qwen3:4b-instruct'
 ROOT = Path(__file__).resolve().parent
 
+def ollama_executable():
+    bundled = ROOT / 'Ollama' / 'ollama.exe'
+    if bundled.is_file():
+        return bundled
+    return Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'Programs' / 'Ollama' / 'ollama.exe'
+
+
 
 class Jarvis:
     def __init__(self):
@@ -76,7 +83,7 @@ class Jarvis:
                    CUDA_VISIBLE_DEVICES='-1', OLLAMA_VULKAN='1')
         try:
             with open(Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'jarvis-server.log', 'ab') as log:
-                subprocess.Popen([str(ROOT / 'Ollama' / 'ollama.exe'), 'serve'],
+                subprocess.Popen([str(ollama_executable()), 'serve'],
                                  env=env, stdout=log, stderr=log,
                                  creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             for _ in range(30):
@@ -376,4 +383,5 @@ if __name__ == '__main__':
         Jarvis().run()
     except (KeyboardInterrupt, EOFError):
         print('\nДжарвис выключен.')
+
 

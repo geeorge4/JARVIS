@@ -36,10 +36,11 @@ def build():
         for file in package_files():zip_.writestr(file.relative_to(ROOT).as_posix(),file.read_bytes())
         zip_.writestr('README.txt',(ROOT/'README.md').read_bytes())
         zip_.write(DIST/'JARVIS.exe','JARVIS.exe')
-    subprocess.run(common+['/reference:System.IO.Compression.dll','/reference:System.IO.Compression.FileSystem.dll','/resource:'+str(payload)+',payload.zip','/out:'+str(DIST/'InstallUpdates.exe'),str(ROOT/'installer'/'InstallUpdates.cs')],check=True)
+    subprocess.run(common+['/reference:System.IO.Compression.dll','/reference:System.IO.Compression.FileSystem.dll','/resource:'+str(payload)+',payload.zip','/out:'+str(DIST/'InstallUpdates.exe'),str(ROOT/'installer'/'InstallUpdates.cs'),str(ROOT/'installer'/'Components.cs')],check=True)
     hashes={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (payload,DIST/'InstallUpdates.exe',DIST/'JARVIS.exe')}
     (DIST/'SHA256SUMS.txt').write_text(''.join(sha+'  '+name+'\n' for name,sha in hashes.items()),encoding='utf-8')
     (DIST/'release.json').write_text(json.dumps({'version':version(),'sha256':hashes},indent=2),encoding='utf-8')
-    print('Built JARVIS '+version()+' — '+str((DIST/'InstallUpdates.exe').stat().st_size)+' byte offline installer')
+    print('Built JARVIS '+version()+' — '+str((DIST/'InstallUpdates.exe').stat().st_size)+' byte installer')
 
 if __name__=='__main__':build()
+
