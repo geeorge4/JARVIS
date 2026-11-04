@@ -5,10 +5,9 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.3.1'
-CHANGES = ('Установка Python, Ollama, Qwen, Дениса и Whisper по галочкам.\n'
-           'Мастер подхватывает локальный набор гимнов.\n'
-           'Готовые настройки и существующие аудиофайлы сохраняются.')
+VERSION = '2.3.2'
+CHANGES = ('Кнопка запуска JARVIS прямо из установщика.\n'
+           'Проверка выбранных компонентов до записи файлов.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

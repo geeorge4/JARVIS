@@ -20,7 +20,7 @@ internal static class Components
         }
     }
 
-    private static string FindPython(string root)
+    internal static string FindPython(string root)
     {
         foreach (string path in new[] {@"Python\python.exe", @"Python\Scripts\python.exe"})
         {
@@ -55,12 +55,16 @@ internal static class Components
         Run("winget.exe", "install --id " + id + " --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity", root);
     }
 
+    internal static void ValidateSelection(string root, bool python, bool ollama, bool model, bool voice)
+    {
+        if ((model || voice) && !python && FindPython(root) == null) throw new IOException("Для выбранных моделей отметьте Python и библиотеки.");
+        if (model && !ollama && FindOllama(root) == null) throw new IOException("Для Qwen отметьте Ollama.");
+    }
+
     internal static void Setup(string root, bool python, bool ollama, bool model, bool voice, Action<string> status)
     {
         root = Path.GetFullPath(root);
         string executable = FindPython(root);
-        if ((model || voice) && !python && executable == null) throw new IOException("Для выбранных моделей отметьте Python и библиотеки.");
-        if (model && !ollama && FindOllama(root) == null) throw new IOException("Для Qwen отметьте Ollama.");
         if (python)
         {
             if (executable == null)

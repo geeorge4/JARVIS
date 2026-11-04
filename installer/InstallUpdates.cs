@@ -111,14 +111,40 @@ internal static class Installer
             Label note = new Label { Text = "Перед обновлением закройте JARVIS через трей.\nДля Python и Ollama используется Windows Package Manager.\nГимны берутся из папки рядом с EXE или текущей установки.", AutoSize = true, Location = new Point(34, 375) };
             Label status = new Label { Text = "Пакет приложения проверен.", Size = new Size(585, 38), Location = new Point(34, 438), ForeColor = Color.LightSkyBlue };
             Button install = new Button { Text = "Установить / обновить", Location = new Point(34, 495), Size = new Size(230, 36), BackColor = Color.FromArgb(56, 96, 145), FlatStyle = FlatStyle.Flat };
+            Button launch = new Button { Text = "Запустить JARVIS", Location = new Point(280, 495), Size = new Size(190, 36), ForeColor = Color.Black, Enabled = false };
+            string completedRoot = null;
+            launch.Click += delegate
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Path.Combine(completedRoot, "JARVIS.exe"))
+                    { WorkingDirectory = completedRoot, UseShellExecute = true });
+                    window.Close();
+                }
+                catch (Exception error)
+                {
+                    MessageBox.Show(window, error.Message, "JARVIS", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            };
             bool busy = false;
             window.FormClosing += delegate(object sender, FormClosingEventArgs eventArgs) { if (busy) eventArgs.Cancel = true; };
             install.Click += delegate
             {
-                string root = pathBox.Text;
+                string root;
                 bool setupPython = python.Checked, setupOllama = ollama.Checked, setupModel = model.Checked, setupVoice = voice.Checked, importAnthems = anthems.Checked;
+                try
+                {
+                    root = Path.GetFullPath(pathBox.Text);
+                    Components.ValidateSelection(root, setupPython, setupOllama, setupModel, setupVoice);
+                }
+                catch (Exception error)
+                {
+                    MessageBox.Show(window, error.Message, "Проверьте выбор компонентов", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
                 busy = true;
                 install.Enabled = false;
+                launch.Enabled = false;
                 status.Text = "Устанавливаю файлы JARVIS…";
                 var worker = new System.ComponentModel.BackgroundWorker();
                 worker.DoWork += delegate
@@ -132,7 +158,12 @@ internal static class Installer
                 {
                     busy = false;
                     install.Enabled = true;
-                    if (result.Error == null) status.Text = "Готово. Запускайте JARVIS.exe из выбранной папки.";
+                    if (result.Error == null)
+                    {
+                        completedRoot = root;
+                        launch.Enabled = Components.FindPython(root) != null;
+                        status.Text = launch.Enabled ? "Готово. JARVIS можно открыть кнопкой ниже." : "Файлы готовы. Для запуска установите Python и библиотеки.";
+                    }
                     else
                     {
                         status.Text = "Установка прервана. Готовые компоненты сохранены.";
@@ -142,7 +173,7 @@ internal static class Installer
                 };
                 worker.RunWorkerAsync();
             };
-            window.Controls.AddRange(new Control[] { title, info, pathBox, browse, python, ollama, model, voice, anthems, note, status, install });
+            window.Controls.AddRange(new Control[] { title, info, pathBox, browse, python, ollama, model, voice, anthems, note, status, install, launch });
             Application.Run(window); return 0;
         }
         catch (Exception error) { if (args.Length == 0) MessageBox.Show(error.Message, "JARVIS package error"); return 1; }
