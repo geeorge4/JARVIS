@@ -112,6 +112,13 @@ internal static class Installer
             Label status = new Label { Text = "Пакет приложения проверен.", Size = new Size(585, 38), Location = new Point(34, 438), ForeColor = Color.LightSkyBlue };
             Button install = new Button { Text = "Установить / обновить", Location = new Point(34, 495), Size = new Size(230, 36), BackColor = Color.FromArgb(56, 96, 145), FlatStyle = FlatStyle.Flat };
             Button launch = new Button { Text = "Запустить JARVIS", Location = new Point(280, 495), Size = new Size(190, 36), ForeColor = Color.Black, Enabled = false };
+            Button showLog = new Button { Text = "Журнал", Location = new Point(485, 495), Size = new Size(135, 36), ForeColor = Color.Black, Enabled = false };
+            string logPath = null;
+            showLog.Click += delegate
+            {
+                try { System.Diagnostics.Process.Start("notepad.exe", "\"" + logPath + "\""); }
+                catch (Exception error) { MessageBox.Show(window, error.Message, "Журнал установки"); }
+            };
             string completedRoot = null;
             launch.Click += delegate
             {
@@ -145,19 +152,44 @@ internal static class Installer
                 busy = true;
                 install.Enabled = false;
                 launch.Enabled = false;
+                showLog.Enabled = false;
+                logPath = Path.Combine(Path.GetTempPath(), "JARVIS-install-" + Guid.NewGuid().ToString("N") + ".log");
                 status.Text = "Устанавливаю файлы JARVIS…";
                 var worker = new System.ComponentModel.BackgroundWorker();
                 worker.DoWork += delegate
                 {
-                    Install(root, files);
-                    Components.Setup(root, setupPython, setupOllama, setupModel, setupVoice,
-                        message => window.BeginInvoke(new Action(() => status.Text = message)));
-                    if (importAnthems) Components.ImportAnthems(root, anthemSource);
+                    using (var writer = new StreamWriter(logPath) { AutoFlush = true })
+                    {
+                        TextWriter log = TextWriter.Synchronized(writer);
+                        try
+                        {
+                            log.WriteLine("Установка JARVIS · " + DateTime.Now.ToString("s"));
+                            log.WriteLine("Копирование файлов приложения");
+                            Install(root, files);
+                            Components.Setup(root, setupPython, setupOllama, setupModel, setupVoice, message =>
+                            {
+                                log.WriteLine(message);
+                                window.BeginInvoke(new Action(() => status.Text = message));
+                            }, log);
+                            if (importAnthems)
+                            {
+                                log.WriteLine("Копирование локальных гимнов");
+                                Components.ImportAnthems(root, anthemSource);
+                            }
+                            log.WriteLine("Установка завершена");
+                        }
+                        catch (Exception error)
+                        {
+                            log.WriteLine(error.ToString());
+                            throw;
+                        }
+                    }
                 };
                 worker.RunWorkerCompleted += delegate(object sender, System.ComponentModel.RunWorkerCompletedEventArgs result)
                 {
                     busy = false;
                     install.Enabled = true;
+                    showLog.Enabled = File.Exists(logPath);
                     if (result.Error == null)
                     {
                         completedRoot = root;
@@ -173,7 +205,7 @@ internal static class Installer
                 };
                 worker.RunWorkerAsync();
             };
-            window.Controls.AddRange(new Control[] { title, info, pathBox, browse, python, ollama, model, voice, anthems, note, status, install, launch });
+            window.Controls.AddRange(new Control[] { title, info, pathBox, browse, python, ollama, model, voice, anthems, note, status, install, launch, showLog });
             Application.Run(window); return 0;
         }
         catch (Exception error) { if (args.Length == 0) MessageBox.Show(error.Message, "JARVIS package error"); return 1; }

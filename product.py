@@ -5,9 +5,9 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.3.2'
-CHANGES = ('Кнопка запуска JARVIS прямо из установщика.\n'
-           'Проверка выбранных компонентов до записи файлов.')
+VERSION = '2.3.3'
+CHANGES = ('Локальный журнал установки с этапами, ошибками и кодами завершения.\n'
+           'Кнопка «Журнал» открывает результат последней попытки.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

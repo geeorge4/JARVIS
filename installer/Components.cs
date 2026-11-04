@@ -8,15 +8,23 @@ internal static class Components
 {
     private static string Quote(string path) { return "\"" + path.TrimEnd('\\') + "\""; }
 
-    private static void Run(string executable, string arguments, string root)
+    private static void Run(string executable, string arguments, string root, TextWriter log)
     {
         var command = new ProcessStartInfo(executable, arguments)
-        { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true };
-        using (var process = Process.Start(command))
+        { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true,
+          RedirectStandardOutput = true, RedirectStandardError = true };
+        log.WriteLine("Запуск: " + Path.GetFileName(executable) + " " + arguments);
+        using (var process = new Process { StartInfo = command })
         {
+            process.OutputDataReceived += (_, line) => { if (line.Data != null) log.WriteLine(line.Data); };
+            process.ErrorDataReceived += (_, line) => { if (line.Data != null) log.WriteLine(line.Data); };
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
             process.WaitForExit();
+            log.WriteLine("Код завершения: " + process.ExitCode);
             if (process.ExitCode != 0)
-                throw new IOException(executable + ": код " + process.ExitCode + ". Проверьте соединение и повторите установку.");
+                throw new IOException(Path.GetFileName(executable) + ": код " + process.ExitCode + ". Подробности в журнале установки.");
         }
     }
 
@@ -50,9 +58,9 @@ internal static class Components
         return File.Exists(installed) ? installed : null;
     }
 
-    private static void Package(string id, string root)
+    private static void Package(string id, string root, TextWriter log)
     {
-        Run("winget.exe", "install --id " + id + " --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity", root);
+        Run("winget.exe", "install --id " + id + " --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity", root, log);
     }
 
     internal static void ValidateSelection(string root, bool python, bool ollama, bool model, bool voice)
@@ -61,7 +69,7 @@ internal static class Components
         if (model && !ollama && FindOllama(root) == null) throw new IOException("Для Qwen отметьте Ollama.");
     }
 
-    internal static void Setup(string root, bool python, bool ollama, bool model, bool voice, Action<string> status)
+    internal static void Setup(string root, bool python, bool ollama, bool model, bool voice, Action<string> status, TextWriter log)
     {
         root = Path.GetFullPath(root);
         string executable = FindPython(root);
@@ -73,32 +81,32 @@ internal static class Components
                 string registered = RegisteredPython();
                 if (registered == null)
                 {
-                    Package("Python.Python.3.12", root);
+                    Package("Python.Python.3.12", root, log);
                     registered = RegisteredPython();
                 }
                 if (registered == null) throw new IOException("Python 3.12 отсутствует после установки.");
-                Run(registered, "-m venv " + Quote(Path.Combine(root, "Python")), root);
+                Run(registered, "-m venv " + Quote(Path.Combine(root, "Python")), root, log);
                 executable = FindPython(root);
                 if (executable == null) throw new IOException("Среда Python не создана.");
             }
             status("Устанавливаю библиотеки Python…");
-            Run(executable, "-m pip --isolated install --no-input --disable-pip-version-check --index-url https://pypi.org/simple -r requirements.txt", root);
+            Run(executable, "-m pip --isolated install --no-input --disable-pip-version-check --index-url https://pypi.org/simple -r requirements.txt", root, log);
         }
         if (ollama && FindOllama(root) == null)
         {
             status("Устанавливаю Ollama через Windows Package Manager…");
-            Package("Ollama.Ollama", root);
+            Package("Ollama.Ollama", root, log);
             if (FindOllama(root) == null) throw new IOException("Ollama не найдена после установки.");
         }
         if (voice)
         {
             status("Загружаю Дениса и Whisper…");
-            Run(executable, "installer/prepare_models.py", root);
+            Run(executable, "installer/prepare_models.py", root, log);
         }
         if (model)
         {
             status("Загружаю Qwen. Это может занять несколько минут…");
-            Run(executable, "installer/prepare_models.py --qwen", root);
+            Run(executable, "installer/prepare_models.py --qwen", root, log);
         }
     }
 
