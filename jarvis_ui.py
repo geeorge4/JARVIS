@@ -7,7 +7,8 @@ from jarvis import Jarvis
 from collections import deque
 import product
 import workflows
-from extra_commands import CATALOG
+from extra_commands import CATALOG, Extras
+from workspace_panel import Workspace
 import windows_shell
 DATA=Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'JARVISASSISTENT'/'phrases.json'
 PREFS=DATA.with_name('settings.json')
@@ -33,9 +34,11 @@ class App:
   self.nav={};self.pages={}
   right=tk.Frame(shell,bg='#121212');right.pack(side='left',fill='both',expand=True)
   self.content=tk.Frame(right,bg='#121212');self.content.pack(fill='both',expand=True)
-  for name in ['Орб','Нейрочат','Команды','Конструктор','Настройки']:
+  for name in ['Орб','Нейрочат','Рабочий стол','Команды','Конструктор','Настройки']:
    b=self.button(self.sidebar,name,lambda n=name:self.page(n));b.pack(fill='x',padx=10,pady=5,ipady=9);self.nav[name]=b
    self.pages[name]=tk.Frame(self.content,bg='#121212')
+  self.workspace=Workspace(self,self.pages['Рабочий стол'],DATA.with_name('notes.json'))
+  self.next_workspace_refresh=0
   self.canvas=tk.Canvas(self.pages['Орб'],bg='#121212',highlightthickness=0);self.canvas.pack(fill='both',expand=True)
   from orb_view import Orb
   self.orb=Orb(self.canvas)
@@ -374,6 +377,7 @@ class App:
    p.pack_forget();self.nav[n].configure(bg='#292929' if n==name else '#151515')
   self.pages[name].pack(fill='both',expand=True)
   if name=='Орб' and hasattr(self,'orb'):self.root.after_idle(self.orb.draw)
+  if name=='Рабочий стол':self.workspace.refresh()
   if hasattr(self,'entry'):self.entry.focus_set()
  def prompt(self,text):self.entry.delete(0,'end');self.entry.insert(0,text+': ');self.entry.focus_set()
  def run_action(self,text):self.entry.delete(0,'end');self.entry.insert(0,text);self.submit()
@@ -471,7 +475,12 @@ class App:
   if self.busy:return
   text=self.entry.get().strip()
   if not mic and not text:return
-  self.entry.delete(0,'end');self.save_draft();self.busy=True;self.status.set('Слушаю…' if mic else 'Выполняю…');self.jobs.put((mic,text))
+  self.entry.delete(0,'end');self.save_draft();self.dispatch(text,mic)
+ def dispatch(self,text,mic=False):
+  if self.busy:
+   self.status.set('Джарвис уже выполняет команду.')
+   return
+  self.busy=True;self.status.set('Слушаю…' if mic else 'Выполняю…');self.jobs.put((mic,text))
  def worker(self):
   import pythoncom
   pythoncom.CoInitialize()
@@ -481,6 +490,7 @@ class App:
    return
   if j.speech:j.speech.on_error=lambda message:self.events.put(('voice_error',message))
   j.notify=lambda text:self.events.put(('reminder',text))
+  j.extras=Extras(j.notify)
   if j.speech:j.speech.set_wake(self.wake_enabled)
   def say(text):
    self.events.put(('answer',text))
@@ -657,6 +667,11 @@ class App:
     else:self.status.set(text)
     if kind=='ready':self.busy=False
   except queue.Empty:pass
+  if self.current=='Рабочий стол' and not self.hidden and self.root.state()!='iconic':
+   now=time.monotonic()
+   if now>=self.next_workspace_refresh:
+    self.next_workspace_refresh=now+1
+    self.workspace.refresh()
   if self.kill_comments and self.assistant and self.assistant.speech:
    if not self.voice_output or not self.commentator_var.get():self.kill_comments.clear()
    elif not self.assistant.speech.speaking.is_set():
@@ -670,3 +685,4 @@ if __name__=='__main__':
  from activation import activate
  import sys
  if activate(force='--activate' in sys.argv) and product.welcome():App()
+

@@ -1,7 +1,7 @@
 """Дополнительные локальные команды без генерации shell-кода."""
 import ctypes
 import datetime as dt
-import json
+import math
 import os
 from pathlib import Path
 import re
@@ -11,6 +11,7 @@ import threading
 import time
 import urllib.parse
 import webbrowser
+from desktop_notes import Notes
 
 SITES={'ютуб':'https://www.youtube.com','гугл':'https://www.google.com',
  'яндекс':'https://ya.ru','википедию':'https://ru.wikipedia.org','гитхаб':'https://github.com',
@@ -45,12 +46,10 @@ class Extras:
     def __init__(self,notify):
         self.notify=notify;self.started=time.monotonic();self.timers={};self.lock=threading.Lock();self.next_id=1
         self.data=Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'JARVISASSISTENT'
+        self.note_store=Notes(self.data/'notes.json')
 
     def notes(self):
-        try:
-            data=json.loads((self.data/'notes.json').read_text(encoding='utf-8'))
-            return data if isinstance(data,list) else []
-        except (OSError,ValueError):return []
+        return self.note_store.list()
 
     def recognized(self,text):
         s=norm(text)
@@ -100,8 +99,7 @@ class Extras:
         if s.startswith('запиши заметку '):
             value=text.strip()[len('запиши заметку '):].strip()
             if not value:return 'Продиктуй текст заметки.'
-            notes=self.notes();notes.append({'text':value[:4000],'date':now.isoformat(timespec='seconds')});notes=notes[-200:]
-            self.data.mkdir(parents=True,exist_ok=True);p=self.data/'notes.json';tmp=p.with_suffix('.tmp');tmp.write_text(json.dumps(notes,ensure_ascii=False),encoding='utf-8');tmp.replace(p)
+            self.note_store.add(value)
             return 'Заметка записана.'
         if s=='покажи заметки' or s.startswith('найди заметку '):
             notes=self.notes();query=s[len('найди заметку '):] if s.startswith('найди заметку ') else ''
@@ -137,3 +135,16 @@ class Extras:
         with self.lock:
             for timer,_ in self.timers.values():timer.cancel()
             self.timers.clear()
+
+    def timer_snapshot(self):
+        with self.lock:
+            now=time.monotonic()
+            return [(identifier,max(0,math.ceil(end-now))) for identifier,(_,end) in self.timers.items()]
+
+    def cancel_timer(self, identifier):
+        with self.lock:
+            entry=self.timers.pop(identifier,None)
+            if entry is None:return False
+            entry[0].cancel()
+            return True
+

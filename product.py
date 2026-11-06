@@ -5,9 +5,10 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.4.1'
-CHANGES = ('Android 1.0.1: добавление и редактирование заметок в приложении.\n'
-           'Удаление заметки теперь требует подтверждения.')
+VERSION = '2.5.0'
+CHANGES = ('Рабочий стол: до 12 настраиваемых быстрых команд.\n'
+           'Поиск и редактор общих заметок, включая записанные голосом.\n'
+           'Готовые интервалы, живой отсчёт и отмена отдельных таймеров.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():
