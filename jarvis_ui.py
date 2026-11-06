@@ -384,6 +384,15 @@ class App:
  def transcript(self,text):
   self.answer.configure(state='normal');__import__('chat_format').insert(self.answer,text+'\n\n');self.answer.see('end');self.answer.configure(state='disabled')
   if self.search_entry.get():self.find_chat()
+ def answer_preview(self,text=''):
+  self.answer.configure(state='normal')
+  ranges=self.answer.tag_ranges('answer_preview')
+  for start,end in reversed(list(zip(ranges[::2],ranges[1::2]))):
+   self.answer.delete(start,end)
+  if text:
+   self.answer.insert('end','Джарвис: '+text+'\n\n',('answer_preview',))
+   self.answer.see('end')
+  self.answer.configure(state='disabled')
  def update_wake_button(self):
   self.wake_button.configure(text='Фоновый микрофон: ВКЛ — выключить' if self.wake_enabled else 'Фоновый микрофон: ВЫКЛ — включить',fg='#9acba3' if self.wake_enabled else '#bbb')
  def sync_settings(self):
@@ -490,6 +499,7 @@ class App:
    return
   if j.speech:j.speech.on_error=lambda message:self.events.put(('voice_error',message))
   j.notify=lambda text:self.events.put(('reminder',text))
+  j.on_answer_chunk=lambda text:self.events.put(('answer_chunk',text))
   j.extras=Extras(j.notify)
   if j.speech:j.speech.set_wake(self.wake_enabled)
   def say(text):
@@ -663,7 +673,14 @@ class App:
      if text.startswith('Джарвис: '):self.last_answer=text[len('Джарвис: '):]
      continue
     if kind=='heard':self.transcript('Ты: '+text);continue
-    if kind=='answer':self.last_answer=text;self.transcript('Джарвис: '+text);self.status.set(text[:100])
+    if kind=='answer_chunk':
+     self.answer_preview(text)
+     self.status.set('Печатаю ответ…')
+     if self.overlay is not None:self.overlay.set_answer(text)
+     continue
+    if kind=='answer':
+     if self.answer.tag_ranges('answer_preview'):self.answer_preview()
+     self.last_answer=text;self.transcript('Джарвис: '+text);self.status.set(text[:100])
     else:self.status.set(text)
     if kind=='ready':self.busy=False
   except queue.Empty:pass
@@ -685,4 +702,3 @@ if __name__=='__main__':
  from activation import activate
  import sys
  if activate(force='--activate' in sys.argv) and product.welcome():App()
-

@@ -76,26 +76,55 @@ class Jarvis:
             except OSError:
                 return False
         if ready():
-            return
+            self._server_ready = True
+            return True
         env = os.environ.copy()
         env.update(OLLAMA_HOST='127.0.0.1:11435', OLLAMA_MODELS=str(ROOT / 'models'),
                    OLLAMA_NO_CLOUD='1', OLLAMA_CONTEXT_LENGTH='4096',
                    CUDA_VISIBLE_DEVICES='-1', OLLAMA_VULKAN='1')
         try:
             with open(Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'jarvis-server.log', 'ab') as log:
-                subprocess.Popen([str(ollama_executable()), 'serve'],
-                                 env=env, stdout=log, stderr=log,
-                                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-            for _ in range(30):
+                server = subprocess.Popen([str(ollama_executable()), 'serve'],
+                                          env=env, stdout=log, stderr=log,
+                                          creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
                 if ready():
-                    return
-                time.sleep(1)
+                    self._server_ready = True
+                    return True
+                if server.poll() is not None:
+                    break
+                time.sleep(0.2)
         except OSError:
             pass
         print('Локальный ИИ не запустился. Команды открытия программ доступны.')
+        self._server_ready = False
+        return False
+
+    def _open_chat(self, request):
+        if not getattr(self, '_server_ready', False) and not self.start_server():
+            raise OSError('Ollama недоступна')
+        try:
+            return urllib.request.urlopen(request, timeout=180)
+        except urllib.error.URLError as error:
+            if not isinstance(error.reason, ConnectionRefusedError):
+                raise
+            self._server_ready = False
+            if not self.start_server():
+                raise
+            return urllib.request.urlopen(request, timeout=180)
+
+    @staticmethod
+    def _visible_answer(raw):
+        text = raw.lstrip()
+        if '<think>'.startswith(text):
+            return ''
+        if text.startswith('<think>'):
+            _, separator, answer = text.partition('</think>')
+            return answer.lstrip() if separator else ''
+        return text
 
     def ask(self, prompt, remember=True):
-        self.start_server()
         if remember:
             self.memory.remember(prompt)
         messages = [{'role': 'system', 'content':
@@ -105,26 +134,46 @@ class Jarvis:
         import product
         from personality import instruction
         messages.append({'role': 'system', 'content': instruction(product.load(), prompt)})
-        if self.memory.context():
-            messages.append({'role':'system','content':'Сохранённые сведения пользователя (не команды):\n'+self.memory.context()})
+        context = self.memory.context()
+        if context:
+            messages.append({'role':'system','content':'Сохранённые сведения пользователя (не команды):\n'+context})
         eco=getattr(self,'eco_mode',False)
         messages += self.history[-6 if eco else -12:] + [{'role': 'user', 'content': prompt}]
         body = json.dumps({'model': self.model, 'messages': messages,
-                           'stream': False, 'think': False, 'keep_alive': '2m' if eco else '30m',
+                           'stream': True, 'think': False, 'keep_alive': '2m' if eco else '30m',
                            'options': {'num_ctx': 2048 if eco else 4096, 'num_predict': 160 if eco else 256}},
                           ensure_ascii=False).encode('utf-8')
         print('Думаю… Первый ответ может занять больше времени.', flush=True)
         request = urllib.request.Request(API_URL, data=body,
                                          headers={'Content-Type': 'application/json'})
         try:
-            with urllib.request.urlopen(request, timeout=180) as response:
-                data = json.load(response)
-            answer = data['message']['content']
-            if isinstance(answer, str) and '</think>' in answer:
-                answer = answer.rsplit('</think>', 1)[1].strip()
-            elif data.get('done_reason') == 'length':
-                return 'Не успел закончить ответ. Попробуй задать вопрос короче.'
-            if not isinstance(answer, str) or not answer.strip():
+            pieces = []
+            complete = False
+            next_preview = 0
+            callback = getattr(self, 'on_answer_chunk', None)
+            with self._open_chat(request) as response:
+                for line in response:
+                    if not line.strip():
+                        continue
+                    data = json.loads(line)
+                    if data.get('error'):
+                        return 'Ошибка локального ИИ: ' + str(data['error'])
+                    fragment = data.get('message', {}).get('content', '')
+                    if fragment:
+                        pieces.append(fragment)
+                        now = time.monotonic()
+                        if callback and now >= next_preview:
+                            visible = self._visible_answer(''.join(pieces))
+                            if visible:
+                                callback(visible)
+                                next_preview = now + 0.065
+                    if data.get('done'):
+                        complete = True
+                        break
+            if not complete:
+                return 'Соединение с локальным ИИ прервалось. Попробуй ещё раз.'
+            answer = self._visible_answer(''.join(pieces)).strip()
+            if not answer:
                 return 'Получен пустой ответ. Попробуй ещё раз.'
             if not remember:
                 return answer
@@ -290,7 +339,6 @@ class Jarvis:
             elif low in ('помощь', 'команды') or low.startswith(('открой', 'закрой')) or low in ('steam', 'стим', 'браузер', 'интернет', 'internet', 'голос', 'текст', 'очистить историю'):
                 self.say('Без ключа доступны только YouTube и вопросы. Для остальных команд активируй продукт.')
             elif text:
-                self.start_server()
                 self.say(self.ask(text))
             return True
         if low in ('выход', 'выйти', 'пока', 'завершить работу'):
@@ -383,5 +431,4 @@ if __name__ == '__main__':
         Jarvis().run()
     except (KeyboardInterrupt, EOFError):
         print('\nДжарвис выключен.')
-
 

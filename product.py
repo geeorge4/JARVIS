@@ -5,10 +5,10 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.5.0'
-CHANGES = ('Рабочий стол: до 12 настраиваемых быстрых команд.\n'
-           'Поиск и редактор общих заметок, включая записанные голосом.\n'
-           'Готовые интервалы, живой отсчёт и отмена отдельных таймеров.')
+VERSION = '2.5.1'
+CHANGES = ('Текст ответов появляется по мере генерации в чате и мини-оверлее.\n'
+           'Убрана лишняя проверка Ollama перед повторными запросами.\n'
+           'Если сервер остановился, JARVIS попробует запустить его снова.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():
@@ -69,4 +69,3 @@ def whats_new(parent, force=False):
         window.destroy()
     tk.Button(window,text='Понятно',command=close).pack(pady=15)
     window.protocol('WM_DELETE_WINDOW',close)
-
