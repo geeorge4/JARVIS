@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.6.0'
-CHANGES = ('Тренер Dust2 сохраняет раскидки со скринами, ищет их из оверлея и помогает тренироваться по памяти.')
+VERSION = '2.6.1'
+CHANGES = ('Android 1.1.0: библиотека раскидок для любых карт CS2, избранное и тренировка по памяти.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

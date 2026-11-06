@@ -41,7 +41,7 @@ public final class MainActivity extends Activity {
     private static final int BLUE = Color.rgb(110, 198, 255);
     private static final int MUTED = Color.rgb(159, 181, 208);
     private static final Locale RU = new Locale("ru", "RU");
-    private static final String HELP = "Скажи или напиши: «который час», «какая дата», «открой YouTube», «открой настройки», «заметка купить молоко», «покажи заметки» или «таймер 5 минут».";
+    private static final String HELP = "Скажи или напиши: «который час», «какая дата», «открой YouTube», «открой настройки», «заметка купить молоко», «покажи заметки» «таймер 5 минут» или «раскидки инферно».";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ArrayList<String> history = new ArrayList<>();
     private SharedPreferences prefs;
@@ -95,6 +95,7 @@ public final class MainActivity extends Activity {
         LinearLayout shortcuts = new LinearLayout(this);
         shortcuts.addView(button("Команды", () -> reply(HELP)), weighted());
         shortcuts.addView(button("Заметки", this::showNotes), weighted());
+        shortcuts.addView(button("Раскидки", () -> openLineups("")), weighted());
         page.addView(shortcuts);
 
         scroll = new ScrollView(this);
@@ -191,6 +192,10 @@ public final class MainActivity extends Activity {
             reply("Заметка сохранена.");
             return;
         }
+        if (command.equals("раскидки") || command.startsWith("раскидки ")) {
+            openLineups(body.substring("раскидки".length()).trim());
+            return;
+        }
         int seconds = Commands.timerSeconds(command);
         if (seconds > 0) {
             handler.removeCallbacks(tick);
@@ -199,6 +204,10 @@ public final class MainActivity extends Activity {
             reply("Таймер запущен на " + seconds + " сек.");
         } else if (seconds < 0) reply("Пример: «таймер 30 секунд» или «таймер 5 минут».");
         else reply("Этой команды пока нет. Нажми «Команды», чтобы посмотреть доступные.");
+    }
+
+    private void openLineups(String query) {
+        startActivity(new Intent(this, LineupsActivity.class).putExtra("query", query));
     }
 
     private JSONArray readNotes() {
@@ -338,4 +347,3 @@ public final class MainActivity extends Activity {
         super.onDestroy();
     }
 }
-
