@@ -5,10 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.5.1'
-CHANGES = ('Текст ответов появляется по мере генерации в чате и мини-оверлее.\n'
-           'Убрана лишняя проверка Ollama перед повторными запросами.\n'
-           'Если сервер остановился, JARVIS попробует запустить его снова.')
+VERSION = '2.5.2'
+CHANGES = ('После голосовой команды JARVIS начинает распознавание на 200 мс раньше.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

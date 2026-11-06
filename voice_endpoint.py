@@ -10,4 +10,4 @@ class EndOfSpeech:
         else:
             self.quiet+=1
             if not self.heard:self.noise=.9*self.noise+.1*rms
-        return (self.heard and self.quiet>=7) or (not self.heard and self.blocks>=30) or self.blocks>=80
+        return (self.heard and self.quiet>=5) or (not self.heard and self.blocks>=30) or self.blocks>=80
