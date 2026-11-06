@@ -10,9 +10,9 @@
 
 **Голосовой помощник и игровой напарник для Windows.** Открывает приложения, отвечает через локальную модель, хранит заметки и реагирует на события CS2. С тёмным интерфейсом, сферой, треем и горячими клавишами.
 
-Создатель: **geeorge42_alt01 on ROBLOX** · [GitHub](https://github.com/geeorge4/JARVIS) · Версия **2.4.0**
+Создатель: **geeorge42_alt01 on ROBLOX** · [GitHub](https://github.com/geeorge4/JARVIS) · Версия **2.4.1**
 
-**JARVIS для Android 1.0.0** работает самостоятельно на телефоне. В первой версии есть локальные команды, заметки, таймер и голосовой ввод Android. [Скачать APK](https://github.com/geeorge4/JARVIS/releases/latest/download/JARVIS-Android.apk) · [Возможности и сборка](mobile/README.md)
+**JARVIS для Android 1.0.1** работает самостоятельно на телефоне. В разделе «Заметки» можно добавлять, редактировать и удалять записи. Также доступны локальные команды, таймер и голосовой ввод Android. [Скачать APK](https://github.com/geeorge4/JARVIS/releases/latest/download/JARVIS-Android.apk) · [Возможности и сборка](https://github.com/geeorge4/JARVIS/blob/main/mobile/README.md)
 
 > Мастер установки для Windows. Выберите нужные компоненты и дождитесь загрузки.
 

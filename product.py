@@ -5,10 +5,9 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.4.0'
-CHANGES = ('Первый самостоятельный JARVIS для Android доступен отдельным APK.\n'
-           'На телефоне: команды, заметки, таймер и голосовой ввод Android.\n'
-           'Ссылка на мобильную версию добавлена в README.')
+VERSION = '2.4.1'
+CHANGES = ('Android 1.0.1: добавление и редактирование заметок в приложении.\n'
+           'Удаление заметки теперь требует подтверждения.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

@@ -94,7 +94,7 @@ public final class MainActivity extends Activity {
 
         LinearLayout shortcuts = new LinearLayout(this);
         shortcuts.addView(button("Команды", () -> reply(HELP)), weighted());
-        shortcuts.addView(button("Заметки", () -> submit("покажи заметки")), weighted());
+        shortcuts.addView(button("Заметки", this::showNotes), weighted());
         page.addView(shortcuts);
 
         scroll = new ScrollView(this);
@@ -210,17 +210,56 @@ public final class MainActivity extends Activity {
         JSONArray notes = readNotes();
         String[] lines = new String[notes.length()];
         for (int i = 0; i < lines.length; i++) lines[i] = notes.optString(i);
-        if (lines.length == 0) { reply("Заметок пока нет. Напиши «заметка» и текст."); return; }
-        new AlertDialog.Builder(this).setTitle("Заметки")
-            .setItems(lines, (dialog, index) -> new AlertDialog.Builder(this)
-                .setTitle("Заметка").setMessage(lines[index])
-                .setPositiveButton("Закрыть", null)
-                .setNeutralButton("Удалить", (removeDialog, button) -> {
+        AlertDialog.Builder list = new AlertDialog.Builder(this).setTitle("Заметки")
+            .setPositiveButton("Добавить", (dialog, button) -> editNote(-1))
+            .setNegativeButton("Закрыть", null);
+        if (lines.length == 0) list.setMessage("Здесь будут твои заметки.");
+        else list.setItems(lines, (dialog, index) -> editNote(index));
+        list.show();
+    }
+
+    private void editNote(int index) {
+        JSONArray notes = readNotes();
+        boolean newNote = index < 0;
+        if (newNote && notes.length() >= 100) { reply("В заметках уже 100 записей."); return; }
+        EditText editor = new EditText(this);
+        editor.setHint("Текст заметки");
+        editor.setMinLines(3);
+        editor.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(1000) });
+        if (!newNote) {
+            editor.setText(notes.optString(index));
+            editor.setSelection(editor.length());
+        }
+        LinearLayout container = column();
+        container.setPadding(dp(20), dp(8), dp(20), dp(8));
+        container.addView(editor, new LinearLayout.LayoutParams(-1, -2));
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+            .setTitle(newNote ? "Новая заметка" : "Редактировать заметку")
+            .setView(container)
+            .setPositiveButton("Сохранить", null)
+            .setNegativeButton("Отмена", (dialog, button) -> showNotes());
+        if (!newNote) builder.setNeutralButton("Удалить", (dialog, button) ->
+            new AlertDialog.Builder(this).setTitle("Удалить заметку?")
+                .setNegativeButton("Отмена", (confirm, choice) -> showNotes())
+                .setPositiveButton("Удалить", (confirm, choice) -> {
                     notes.remove(index);
                     prefs.edit().putString("notes", notes.toString()).apply();
-                    reply("Заметка удалена.");
-                }).show())
-            .setPositiveButton("Закрыть", null).show();
+                    showNotes();
+                }).show());
+        AlertDialog dialog = builder.show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            String value = editor.getText().toString().trim();
+            if (value.isEmpty()) { editor.setError("Введи текст заметки"); return; }
+            try {
+                notes.put(newNote ? notes.length() : index, value);
+                prefs.edit().putString("notes", notes.toString()).apply();
+            } catch (JSONException error) {
+                editor.setError("Не удалось сохранить заметку");
+                return;
+            }
+            dialog.dismiss();
+            showNotes();
+        });
     }
 
     private void listen() {
