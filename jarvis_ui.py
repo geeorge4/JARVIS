@@ -37,6 +37,8 @@ class App:
   for name in ['Орб','Нейрочат','Рабочий стол','Команды','Конструктор','Настройки']:
    b=self.button(self.sidebar,name,lambda n=name:self.page(n));b.pack(fill='x',padx=10,pady=5,ipady=9);self.nav[name]=b
    self.pages[name]=tk.Frame(self.content,bg='#121212')
+  self.lineups=None
+  self.button(self.sidebar,'Тренер Dust2',lambda:self.open_lineups()).pack(fill='x',padx=10,pady=5,ipady=9)
   self.workspace=Workspace(self,self.pages['Рабочий стол'],DATA.with_name('notes.json'))
   self.next_workspace_refresh=0
   self.canvas=tk.Canvas(self.pages['Орб'],bg='#121212',highlightthickness=0);self.canvas.pack(fill='both',expand=True)
@@ -309,6 +311,19 @@ class App:
  def save_ace_setting(self):
   try:product.save(cs2_ace=self.ace_var.get())
   except OSError as exc:self.status.set('Не удалось сохранить настройку CS2: '+str(exc))
+ def open_lineups(self,query=None,parent=None):
+  if self.lineups is not None and self.lineups.window.winfo_exists():
+   if query is not None:self.lineups.query.set(query)
+   self.lineups.window.attributes('-topmost',parent is not None)
+   self.lineups.window.lift()
+   self.lineups.window.focus_force()
+   return
+  try:
+   from dust2_lineups import Lineups
+   self.lineups=Lineups(self,parent or self.root,DATA.parent/'dust2-lineups',query or '')
+  except (OSError,ValueError,ImportError) as exc:
+   messagebox.showerror('Тренер Dust2',str(exc),parent=parent or self.root)
+
  def setup_overlay_hotkey(self):
   try:
    from hotkey import Hotkey

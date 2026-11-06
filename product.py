@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.5.2'
-CHANGES = ('После голосовой команды JARVIS начинает распознавание на 200 мс раньше.')
+VERSION = '2.6.0'
+CHANGES = ('Тренер Dust2 сохраняет раскидки со скринами, ищет их из оверлея и помогает тренироваться по памяти.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():
