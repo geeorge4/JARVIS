@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.7.0'
-CHANGES = ('ПК: тренер для любых карт CS2, фильтр карты, избранное, редактирование и удаление карточек. Старые карточки доступны в разделе «Без карты».')
+VERSION = '2.8.0'
+CHANGES = ('Рабочий стол → Сессия: киллы, смерти, K/D, игровое время и средний FPS по замерам CSV. Кнопки управления сессией и подключения FPS.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

@@ -1,4 +1,5 @@
 """Bounded local game journal and observed CS2 session, no polling."""
+import math
 import json
 import os
 from pathlib import Path
@@ -36,13 +37,23 @@ class Session:
             if game.get('name') and game['name'] not in self.data['maps']:self.data['maps'].append(game['name']);self.data['maps']=self.data['maps'][-30:]
             self.data['samples']+=1
             if now-self.saved>=30:self.save();self.saved=now
+    def sample_fps(self, fps):
+        if not isinstance(fps, (int, float)) or isinstance(fps, bool) or not math.isfinite(fps) or fps <= 0:
+            return
+        with LOCK:
+            if not self.data or self.data.get('ended') or self.last_time is None or time.monotonic()-self.last_time > 15:
+                return
+            self.data['fps_sum'] = self.data.get('fps_sum', 0) + fps
+            self.data['fps_count'] = self.data.get('fps_count', 0) + 1
+            self.save()
+
     def save(self):
         if self.data:write('game-session.json',self.data)
     def report(self):
         with LOCK:
             if not self.data:return 'Пока нет данных сессии. Запусти CS2 и зайди в матч.'
             self.save();d=self.data
-            return ('Игровая сессия с '+d['started']+'\nНаблюдаемое игровое время: '+str(int(d['active_seconds']//60))+' мин.\nКиллы: '+str(d['kills'])+' · смерти: '+str(d['deaths'])+'\nКарты: '+(', '.join(d['maps']) or 'нет данных')+'\nУчитываются только изменения после подключения JARVIS. Время приблизительное; FPS и итоги матчей здесь не измеряются.')
+            return ('Игровая сессия с '+d['started']+'\nНаблюдаемое игровое время: '+str(int(d['active_seconds']//60))+' мин.\nКиллы: '+str(d['kills'])+' · смерти: '+str(d['deaths'])+'\nКарты: '+(', '.join(d['maps']) or 'нет данных')+'\nУчитываются только изменения после подключения JARVIS. Время приблизительное; итоги матчей здесь не измеряются.')
 session=Session()
 def recognized(text):
     low=text.casefold().replace('ё','е').strip(' .!?')

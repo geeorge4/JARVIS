@@ -106,10 +106,13 @@ class Services:
                     self.events.put(('wt_status','War Thunder: подключён'))
                 except (OSError,ValueError,TypeError,AttributeError):
                     self.events.put(('wt_status','War Thunder: ожидаю запуск игры'));self.wt=WTDetector();last_wt=now+5
-            if prefs.get('performance_guard',True) and now-last_metrics>=15:
+            if (prefs.get('performance_guard',True) or prefs.get('fps_csv')) and now-last_metrics>=15:
                 last_metrics=now
                 try:
-                    metrics=sample_metrics(prefs.get('fps_csv',''));paused=self.guard.update(metrics)
+                    metrics=sample_metrics(prefs.get('fps_csv',''))
+                    from game_journal import session
+                    session.sample_fps(metrics.get('fps'))
+                    paused=self.guard.update(metrics) if prefs.get('performance_guard',True) else False
                     self.events.put(('metrics',(metrics,paused)))
                 except Exception:self.events.put(('metrics_error','Датчики недоступны'))
             elif not prefs.get('performance_guard',True):self.guard=Guard();self.events.put(('guard_off',''))

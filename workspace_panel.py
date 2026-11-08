@@ -33,11 +33,13 @@ class Workspace:
         app.heading(parent, 'Рабочий стол', 'Команды, заметки и таймеры')
         tabs = tk.Frame(parent, bg=BG)
         tabs.pack(fill='x', padx=16, pady=(0, 8))
-        for name in ('Быстрые команды', 'Заметки', 'Таймеры'):
+        for name in ('Быстрые команды', 'Заметки', 'Таймеры', 'Сессия'):
             button = app.button(tabs, name, lambda selected=name: self.show(selected))
             button.pack(side='left', fill='x', expand=True, padx=2)
             self.tabs[name] = button
             self.panes[name] = tk.Frame(parent, bg=BG)
+        from session_panel import SessionPanel
+        self.session_panel = SessionPanel(app, self.panes['Сессия'])
         self.build_pins()
         self.build_notes()
         self.build_timers()
@@ -269,8 +271,9 @@ class Workspace:
                 self.timer_list.selection_set(row)
 
     def refresh(self):
+        if self.current == 'Сессия':
+            self.session_panel.refresh()
         if self.current == 'Заметки':
             self.refresh_notes()
         elif self.current == 'Таймеры':
             self.refresh_timers()
-
