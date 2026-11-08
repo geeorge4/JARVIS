@@ -38,7 +38,7 @@ class App:
    b=self.button(self.sidebar,name,lambda n=name:self.page(n));b.pack(fill='x',padx=10,pady=5,ipady=9);self.nav[name]=b
    self.pages[name]=tk.Frame(self.content,bg='#121212')
   self.lineups=None
-  self.button(self.sidebar,'Тренер Dust2',lambda:self.open_lineups()).pack(fill='x',padx=10,pady=5,ipady=9)
+  self.button(self.sidebar,'Раскидки CS2',lambda:self.open_lineups()).pack(fill='x',padx=10,pady=5,ipady=9)
   self.workspace=Workspace(self,self.pages['Рабочий стол'],DATA.with_name('notes.json'))
   self.next_workspace_refresh=0
   self.canvas=tk.Canvas(self.pages['Орб'],bg='#121212',highlightthickness=0);self.canvas.pack(fill='both',expand=True)
@@ -322,7 +322,7 @@ class App:
    from dust2_lineups import Lineups
    self.lineups=Lineups(self,parent or self.root,DATA.parent/'dust2-lineups',query or '')
   except (OSError,ValueError,ImportError) as exc:
-   messagebox.showerror('Тренер Dust2',str(exc),parent=parent or self.root)
+   messagebox.showerror('Раскидки CS2',str(exc),parent=parent or self.root)
 
  def setup_overlay_hotkey(self):
   try:

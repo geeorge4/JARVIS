@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.6.1'
-CHANGES = ('Android 1.1.0: библиотека раскидок для любых карт CS2, избранное и тренировка по памяти.')
+VERSION = '2.7.0'
+CHANGES = ('ПК: тренер для любых карт CS2, фильтр карты, избранное, редактирование и удаление карточек. Старые карточки доступны в разделе «Без карты».')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

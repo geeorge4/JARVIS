@@ -20,7 +20,7 @@ class MiniOverlay:
         self.entry.bind('<Return>',lambda e:self.send())
         tk.Button(row,text='➤',command=self.send,bg='#29485c',fg='white',bd=0).pack(side='left',padx=4)
         tk.Button(row,text='Микр.',command=self.mic,bg='#29485c',fg='white',bd=0).pack(side='left')
-        tk.Button(row,text='Dust2',command=self.lineups,bg='#29485c',fg='white',bd=0).pack(side='left',padx=4)
+        tk.Button(row,text='CS2',command=self.lineups,bg='#29485c',fg='white',bd=0).pack(side='left',padx=4)
         self.window.bind('<Escape>',lambda e:self.hide())
         self.set_answer(app.last_answer or 'Введи команду. Esc — скрыть оверлей.');self.entry.focus_force()
 
