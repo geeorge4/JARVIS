@@ -3,9 +3,20 @@ import random
 import time
 import threading
 
+KILL_LINES = {
+    1: ('Есть первый, сэр.', 'Первый пошёл!', 'Вот это выстрел.', 'Один снят. Продолжаем.'),
+    2: ('Уже двое. Пошла игра!', 'Второй следом!', 'Два подряд, сэр. Красиво.', 'И второй готов.'),
+    3: ('Трое за раунд! Вот это темп.', 'Уже три, сэр. Хорошо идём.', 'Третий тоже твой!', 'Три минуса. Ты разыгрался.'),
+    4: ('Четверых сам забрал! Красиво.', 'Четыре за раунд, сэр!', 'Четвёртый тоже лёг!', 'Вот это раунд. Уже четверо.'),
+    5: ('Пятый! Весь раунд твой, сэр.', 'Пять за раунд! Вот это было красиво.', 'Все пятеро твои!'),
+}
+EXTRA_KILL_LINES = ('И ещё один!', 'Хорошо поймал.', 'Отлично, сэр. Держим темп.')
+
+
 class Commentator:
     def __init__(self,chance=.10,cooldown=20,clock=time.monotonic,rng=random.random):
         self.chance=chance;self.cooldown=cooldown;self.clock=clock;self.rng=rng
+        self.last_kill_line = None
         self.kill_baseline=None;self.previous=None;self.last_spoken=-1e9;self.lock=threading.Lock()
 
     def update(self,data,quiet=False):
@@ -27,11 +38,12 @@ class Commentator:
             delta=max(0,counter-old_counter[1])
         if delta and not quiet:
             self.previous=((game.get('name'),game.get('round'),player['steamid']),roundkills,player.get('state',{}).get('health'),round_.get('phase'))
-            phrases={1:'Минус один.',2:'Двойное убийство.',3:'Тройное убийство!',4:'Четверо!'}
             events=[]
             for i in range(delta):
-                number=roundkills-delta+i+1 if isinstance(roundkills,int) else 1
-                events.append({'type':'kill','text':phrases.get(number,'Ещё один минус!')})
+                number = roundkills-delta+i+1 if isinstance(roundkills,int) else None
+                lines = KILL_LINES.get(number, EXTRA_KILL_LINES)
+                self.last_kill_line = random.choice([line for line in lines if line != self.last_kill_line])
+                events.append({'type':'kill','text':self.last_kill_line})
             return events
         state=player.get('state',{});kills=state.get('round_kills');health=state.get('health');number=game.get('round')
         if not all(isinstance(v,int) for v in (kills,health,number)):return None
