@@ -32,7 +32,7 @@ internal static class Installer
                 foreach (string part in parts) if (part.Length == 0 || part.EndsWith(".") || part.EndsWith(" ")) throw new InvalidDataException("Invalid path component");
                 if (parts.Length > 1 && parts[0] != "installer" && parts[0] != "assets") throw new InvalidDataException("Protected directory");
                 string ext = Path.GetExtension(name).ToLowerInvariant();
-                if (Array.IndexOf(new string[] {".py", ".md", ".txt", ".ico", ".svg", ".exe"}, ext) < 0 && name != "LICENSE") throw new InvalidDataException("Unexpected file type");
+                if (Array.IndexOf(new string[] {".py", ".md", ".txt", ".ico", ".svg", ".exe"}, ext) < 0 && name != "LICENSE" && name != "jarvis_audio.dll") throw new InvalidDataException("Unexpected file type");
                 if (ext == ".exe" && name != "JARVIS.exe") throw new InvalidDataException("Unexpected executable");
                 if (entry.Length > 10000000 || (total += entry.Length) > 30000000 || files.Count >= 200) throw new InvalidDataException("Package too large");
                 using (Stream stream = entry.Open()) using (MemoryStream target = new MemoryStream()) { stream.CopyTo(target); files.Add(name, target.ToArray()); }
@@ -211,4 +211,3 @@ internal static class Installer
         catch (Exception error) { if (args.Length == 0) MessageBox.Show(error.Message, "JARVIS package error"); return 1; }
     }
 }
-

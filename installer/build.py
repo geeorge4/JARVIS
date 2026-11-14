@@ -4,6 +4,7 @@ import ast
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import zipfile
 
@@ -30,12 +31,17 @@ def build():
     icon=ROOT/'JARVIS.ico'
     common=[str(csc),'/nologo','/target:winexe','/optimize+','/reference:System.Windows.Forms.dll','/reference:System.Drawing.dll']
     if icon.exists():common.append('/win32icon:'+str(icon))
+    rustc = shutil.which('rustc') or Path.home() / '.cargo' / 'bin' / 'rustc.exe'
+    audio_dll = DIST / 'jarvis_audio.dll'
+    subprocess.run([str(rustc), '--crate-type', 'cdylib', '-O', str(ROOT/'native'/'audio.rs'),
+                    '-o', str(audio_dll)], check=True)
     subprocess.run(common+['/out:'+str(DIST/'JARVIS.exe'),str(ROOT/'installer'/'Launcher.cs')],check=True)
     payload=DIST/'jarvis-app.zip'
     with zipfile.ZipFile(payload,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as zip_:
         for file in package_files():zip_.writestr(file.relative_to(ROOT).as_posix(),file.read_bytes())
         zip_.writestr('README.txt',(ROOT/'README.md').read_bytes())
         zip_.write(DIST/'JARVIS.exe','JARVIS.exe')
+        zip_.write(audio_dll, 'jarvis_audio.dll')
     subprocess.run(common+['/reference:System.IO.Compression.dll','/reference:System.IO.Compression.FileSystem.dll','/resource:'+str(payload)+',payload.zip','/out:'+str(DIST/'InstallUpdates.exe'),str(ROOT/'installer'/'InstallUpdates.cs'),str(ROOT/'installer'/'Components.cs')],check=True)
     hashes={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (payload,DIST/'InstallUpdates.exe',DIST/'JARVIS.exe')}
     (DIST/'SHA256SUMS.txt').write_text(''.join(sha+'  '+name+'\n' for name,sha in hashes.items()),encoding='utf-8')
@@ -43,4 +49,3 @@ def build():
     print('Built JARVIS '+version()+' — '+str((DIST/'InstallUpdates.exe').stat().st_size)+' byte installer')
 
 if __name__=='__main__':build()
-

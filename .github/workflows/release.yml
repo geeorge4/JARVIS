@@ -15,6 +15,8 @@ jobs:
           python-version: '3.12'
       - name: Check Python sources
         run: python -m compileall -q . -x '(dist|\.git)'
+      - name: Install Rust toolchain
+        run: rustup default stable-x86_64-pc-windows-msvc
       - name: Build component installer
         run: python installer/build.py
       - name: Run checks
@@ -43,4 +45,3 @@ jobs:
           }
           gh release create $tag dist/InstallUpdates.exe dist/JARVIS.exe dist/jarvis-app.zip dist/JARVIS-Android.apk dist/SHA256SUMS.txt dist/release.json --target $env:GITHUB_SHA --title "JARVIS $version" --notes 'Windows installer and standalone Android preview. See README for platform-specific features.'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-

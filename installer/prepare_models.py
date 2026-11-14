@@ -19,6 +19,7 @@ def prepare_voice():
             urllib.request.urlretrieve('https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/denis/medium/' + name, temporary)
             temporary.replace(path)
     snapshot_download('Systran/faster-whisper-base', local_dir=folder / 'whisper-base', allow_patterns=['config.json', 'model.bin', 'tokenizer.json', 'vocabulary.*'])
+    snapshot_download('Systran/faster-whisper-tiny', local_dir=folder / 'whisper-tiny', allow_patterns=['config.json', 'model.bin', 'tokenizer.json', 'vocabulary.*'])
     import product
     if 'voice_engine' not in product.load():
         product.save(voice_engine='piper')
@@ -57,4 +58,3 @@ if __name__ == '__main__':
         prepare_qwen()
     else:
         prepare_voice()
-

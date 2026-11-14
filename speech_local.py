@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'speech-deps'))
 import numpy as np
 import sounddevice as sd
+from native_audio import pcm_rms
 from piper import PiperVoice, SynthesisConfig
 
 
@@ -21,6 +22,8 @@ class Speech:
         self.xtts=XttsVoice()
         self.on_error=lambda message:print(message)
         self.stt = None
+        self.wake_stt = None
+        self.wake_new_peak = 0.0
         self.generation = 0
         self.duck_until = 0
         self.closed = threading.Event()
@@ -96,10 +99,22 @@ class Speech:
                                    compute_type='int8', cpu_threads=2,
                                    local_files_only=True)
 
-    def transcribe(self, audio):
+    def prepare_wake(self):
+        if self.wake_stt is None:
+            from faster_whisper import WhisperModel
+            model = ROOT / 'whisper-tiny'
+            if not (model / 'model.bin').is_file():
+                self.prepare()
+                return self.stt
+            self.wake_stt = WhisperModel(str(model), device='cpu', compute_type='int8',
+                                         cpu_threads=1, local_files_only=True)
+        return self.wake_stt
+
+    def transcribe(self, audio, initial_prompt=None):
         self.prepare()
         segments, _ = self.stt.transcribe(audio, language='ru', beam_size=3,
-                                          vad_filter=True, condition_on_previous_text=False)
+                                          vad_filter=True, condition_on_previous_text=False,
+                                          initial_prompt=initial_prompt)
         return ' '.join(s.text.strip() for s in segments).strip()
 
     def set_wake(self, enabled):
@@ -117,23 +132,27 @@ class Speech:
                 stream.close()
             with self.wake_lock:
                 self.wake_audio.clear()
+                self.wake_new_peak = 0.0
 
     @staticmethod
     def extract_wake(text):
         import re
-        match = re.search(r'дж[аеэ]р[вф][иеы]с|джарвис|jarvis|jervis', text, re.I)
+        match = re.search(r'(?<!\w)(?:дж[аеэ]р[вф][иеы]с|jarvis|jervis)(?!\w)', text, re.I)
         return text[match.end():].strip(' ,.!?') if match else None
 
     def wake_phrase(self):
         if self.closed.is_set() or self.speaking.is_set() or not self.wake_allowed.is_set():
             return None
-        self.prepare()
+        model = self.prepare_wake()
         with self.wake_control:
             if not self.wake_allowed.is_set(): return None
             if self.wake_stream is None:
                 def capture(indata, frames, timing, status):
+                    block = indata[:, 0].copy()
+                    peak = pcm_rms(block)
                     with self.wake_lock:
-                        self.wake_audio.append(indata[:, 0].copy())
+                        self.wake_audio.append(block)
+                        self.wake_new_peak = max(self.wake_new_peak, peak)
                 self.wake_stream = sd.InputStream(samplerate=16000, channels=1,
                     dtype='float32', blocksize=1600, callback=capture)
                 self.wake_stream.start()
@@ -145,18 +164,22 @@ class Speech:
         with self.wake_lock:
             if len(self.wake_audio) < 8:
                 return None
+            peak = self.wake_new_peak
+            self.wake_new_peak = 0.0
+            if peak < 0.0015:
+                return None
             audio = np.concatenate(list(self.wake_audio))
-        # Проверяем короткие блоки: тихое слово не теряется в средней громкости окна.
-        blocks = audio[:len(audio)//1600*1600].reshape(-1,1600)
-        if float(np.max(np.sqrt(np.mean(blocks*blocks,axis=1)))) < 0.0015:
-            return None
-        segments, _ = self.stt.transcribe(audio, language='ru', beam_size=3,
+        segments, _ = model.transcribe(audio, language='ru', beam_size=3,
             vad_filter=False, condition_on_previous_text=False,
             initial_prompt='Имя ассистента: Джарвис. Jarvis.')
-        if not self.wake_allowed.is_set(): return None
         result = self.extract_wake(' '.join(segment.text for segment in segments))
+        if not self.wake_allowed.is_set():
+            return None
         if result is not None:
             self.stop_wake()
+            if result and model is self.wake_stt:
+                command = self.extract_wake(self.transcribe(audio, initial_prompt='Джарвис,'))
+                result = command or ''
         return result
 
     def listen(self):
@@ -169,6 +192,6 @@ class Speech:
             while not self.closed.is_set():
                 data,overflowed=stream.read(1600)
                 block=data[:,0].copy();blocks.append(block)
-                if endpoint.feed(float(np.sqrt(np.mean(block*block)))):break
+                if endpoint.feed(pcm_rms(block)):break
         if not endpoint.heard or self.closed.is_set():return ''
         return self.transcribe(np.concatenate(blocks))

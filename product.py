@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.8.0'
-CHANGES = ('Рабочий стол → Сессия: киллы, смерти, K/D, игровое время и средний FPS по замерам CSV. Кнопки управления сессией и подключения FPS.')
+VERSION = '2.9.0'
+CHANGES = ('Whisper Tiny слушает слово «Джарвис» в фоне. Rust проверяет громкость аудио. После активации команду обрабатывает обычный голосовой режим.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():
