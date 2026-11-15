@@ -1,6 +1,8 @@
 """Shared storage for desktop notes created by UI and voice commands."""
 from datetime import datetime
 import json
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 import threading
 
 _lock = threading.RLock()
@@ -26,6 +28,32 @@ class Notes:
         temporary = self.path.with_suffix('.tmp')
         temporary.write_text(json.dumps(notes, ensure_ascii=False), encoding='utf-8')
         temporary.replace(self.path)
+
+    def export_text(self, destination):
+        destination = Path(destination)
+        if destination.suffix.lower() != '.txt':
+            raise ValueError('Для экспорта выбери файл с расширением .txt.')
+        notes = self.list()
+        if not notes:
+            return 0
+        blocks = []
+        for index, note in enumerate(notes, start=1):
+            date = note.get('date')
+            heading = f'Заметка {index}'
+            if isinstance(date, str) and date.strip():
+                heading += f' · {date.replace("T", " ", 1)}'
+            blocks.append(f'{heading}\n{note["text"]}')
+        temporary = None
+        try:
+            with NamedTemporaryFile(mode='w', encoding='utf-8', dir=destination.parent,
+                                    prefix='.jarvis-notes-', delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write('\n\n'.join(blocks) + '\n')
+            temporary.replace(destination)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        return len(notes)
 
     def add(self, text):
         with _lock:

@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.10.0'
-CHANGES = ('Таймеры с часами, минутами и секундами в одной команде. Отмена одного таймера по номеру.')
+VERSION = '2.11.0'
+CHANGES = ('В заметках появились копирование выбранной записи и экспорт всех записей в текстовый файл.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

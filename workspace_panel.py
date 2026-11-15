@@ -1,6 +1,6 @@
 """Desktop workspace for pinned commands, shared notes and active timers."""
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import filedialog, messagebox, simpledialog
 
 from activation import mode
 from desktop_notes import Notes
@@ -115,10 +115,13 @@ class Workspace:
         self.note_list = self.listbox(pane)
         self.note_list.bind('<Double-Button-1>', lambda _: self.edit_selected())
         self.note_list.bind('<Return>', lambda _: self.edit_selected())
+        self.note_list.bind('<Control-c>', self.copy_note)
         actions = tk.Frame(pane, bg=BG)
         actions.pack(fill='x')
         self.app.button(actions, 'Редактировать', self.edit_selected).pack(side='left')
         self.app.button(actions, 'Удалить', self.delete_note).pack(side='left')
+        self.app.button(actions, 'Копировать', self.copy_note).pack(side='left')
+        self.app.button(actions, 'Экспорт всех', self.export_notes).pack(side='left')
         self.note_info = tk.Label(actions, bg=BG, fg='#9ab0be')
         self.note_info.pack(side='right')
         self.search.trace_add('write', lambda *_: self.refresh_notes())
@@ -169,6 +172,30 @@ class Workspace:
         item = self.selected_note()
         if item is not None:
             self.edit_note(item)
+
+    def copy_note(self, event=None):
+        item = self.selected_note()
+        if item is not None and self.full_mode():
+            self.app.root.clipboard_clear()
+            self.app.root.clipboard_append(item[1]['text'])
+            self.app.status.set('Заметка скопирована')
+        return 'break'
+
+    def export_notes(self):
+        if not self.full_mode():
+            return
+        destination = filedialog.asksaveasfilename(
+            parent=self.app.root, title='Экспорт всех заметок', initialfile='JARVIS-заметки.txt',
+            defaultextension='.txt', filetypes=[('Текстовый файл', '*.txt')],
+        )
+        if not destination:
+            return
+        try:
+            count = self.notes.export_text(destination)
+        except (OSError, ValueError) as error:
+            messagebox.showerror('Экспорт заметок', str(error), parent=self.app.root)
+            return
+        self.app.status.set(f'Заметок сохранено: {count}' if count else 'Нет заметок для экспорта')
 
     def edit_note(self, item):
         if not self.full_mode():
