@@ -54,6 +54,8 @@
 - Закрытие окна скрывает его в трей. Для завершения: значок JARVIS → **Выйти**.
 - Фоновый микрофон можно полностью выключить. Распознавание работает локально после загрузки модели.
 
+**Linux** · [Отдельный репозиторий JARVIS-Linux](https://github.com/geeorge4/JARVIS-Linux)
+
 ## Скачать и обновить
 
 **[Скачать InstallUpdates.exe](https://github.com/geeorge4/JARVIS/releases/latest/download/InstallUpdates.exe)** · [Выпуски](https://github.com/geeorge4/JARVIS/releases)
