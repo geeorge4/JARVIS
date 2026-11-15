@@ -3,30 +3,48 @@ import random
 import time
 import threading
 
-KILL_LINES = {
-    1: ('Есть первый, сэр.', 'Первый пошёл!', 'Вот это выстрел.', 'Один снят. Продолжаем.'),
-    2: ('Уже двое. Пошла игра!', 'Второй следом!', 'Два подряд, сэр. Красиво.', 'И второй готов.'),
-    3: ('Трое за раунд! Вот это темп.', 'Уже три, сэр. Хорошо идём.', 'Третий тоже твой!', 'Три минуса. Ты разыгрался.'),
-    4: ('Четверых сам забрал! Красиво.', 'Четыре за раунд, сэр!', 'Четвёртый тоже лёг!', 'Вот это раунд. Уже четверо.'),
-    5: ('Пятый! Весь раунд твой, сэр.', 'Пять за раунд! Вот это было красиво.', 'Все пятеро твои!'),
-}
-EXTRA_KILL_LINES = ('И ещё один!', 'Хорошо поймал.', 'Отлично, сэр. Держим темп.')
+from cs2_reactions import BOMB_LINES, EXTRA_KILL_LINES, KILL_LINES
 
 
 class Commentator:
     def __init__(self,chance=.10,cooldown=20,clock=time.monotonic,rng=random.random):
         self.chance=chance;self.cooldown=cooldown;self.clock=clock;self.rng=rng
         self.last_kill_line = None
+        self.last_bomb_line = None
+        self.bomb_round = None
+        self.bomb_seen = set()
         self.kill_baseline=None;self.previous=None;self.last_spoken=-1e9;self.lock=threading.Lock()
 
     def update(self,data,quiet=False):
         with self.lock:return self._update(data,quiet)
 
+    def bomb_event(self, data, key, quiet):
+        states = {data.get('round', {}).get('bomb'), data.get('bomb', {}).get('state')}
+        event = next((state for state in ('defused', 'planted') if state in states), None)
+        first_packet = self.bomb_round is None
+        if key != self.bomb_round:
+            self.bomb_round = key
+            self.bomb_seen.clear()
+        if event is None or event in self.bomb_seen:
+            return None
+        self.bomb_seen.add(event)
+        if event == 'defused':
+            self.bomb_seen.add('planted')
+        if quiet or first_packet:
+            return None
+        lines = BOMB_LINES[event]
+        self.last_bomb_line = random.choice([line for line in lines if line != self.last_bomb_line])
+        return {'type': event, 'text': self.last_bomb_line}
+
     def _update(self,data,quiet):
         player=data.get('player',{});game=data.get('map',{});provider=data.get('provider',{});round_=data.get('round',{})
         if (str(provider.get('appid'))!='730' or not provider.get('steamid') or player.get('steamid')!=provider['steamid'] or
-            game.get('phase')!='live' or player.get('activity')!='playing'):
+            game.get('phase') not in ('live','gameover') or player.get('activity')!='playing'):
             return None
+        bomb = self.bomb_event(data, (game.get('name'), game.get('round'), player['steamid']), quiet)
+        events = [bomb] if bomb else []
+        if game.get('phase') == 'gameover':
+            return events or None
         total=player.get('match_stats',{}).get('kills')
         roundkills=player.get('state',{}).get('round_kills')
         counter=total if isinstance(total,int) else roundkills
@@ -38,12 +56,13 @@ class Commentator:
             delta=max(0,counter-old_counter[1])
         if delta and not quiet:
             self.previous=((game.get('name'),game.get('round'),player['steamid']),roundkills,player.get('state',{}).get('health'),round_.get('phase'))
-            events=[]
             for i in range(delta):
                 number = roundkills-delta+i+1 if isinstance(roundkills,int) else None
                 lines = KILL_LINES.get(number, EXTRA_KILL_LINES)
                 self.last_kill_line = random.choice([line for line in lines if line != self.last_kill_line])
                 events.append({'type':'kill','text':self.last_kill_line})
+            return events
+        if events:
             return events
         state=player.get('state',{});kills=state.get('round_kills');health=state.get('health');number=game.get('round')
         if not all(isinstance(v,int) for v in (kills,health,number)):return None

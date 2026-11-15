@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.12.0'
-CHANGES = ('Экономный режим чата теперь можно включить вручную в настройках.')
+VERSION = '2.13.0'
+CHANGES = ('CS2: 200 вариантов реплик за киллы, по 15 за установку и обезвреживание бомбы.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

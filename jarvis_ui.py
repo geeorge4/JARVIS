@@ -659,7 +659,7 @@ class App:
       except (OSError,RuntimeError) as exc:self.transcript('Не удалось включить дроп: '+str(exc))
      continue
     if kind=='commentary':
-     if isinstance(text,dict) and text.get('type')=='kill':
+     if isinstance(text,dict) and text.get('type') in ('kill','planted','defused'):
       if self.commentator_var.get():
        self.transcript('CS2: '+text['text'])
        if self.voice_output:self.kill_comments.append(text['text'])

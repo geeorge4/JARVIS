@@ -93,8 +93,10 @@ class AceServer:
                         for event in comment:
                             if event.get('type')=='kill':kill_callback()
                     if ace:callback(PHRASE)
-                    elif comment and comment_callback:
-                        for event in (comment if isinstance(comment,list) else [comment]):comment_callback(event)
+                    if comment and comment_callback:
+                        for event in (comment if isinstance(comment,list) else [comment]):
+                            if not ace or (isinstance(event,dict) and event.get('type') in ('planted','defused')):
+                                comment_callback(event)
                     self.send_response(200);self.end_headers();self.wfile.write(b'OK')
                 except (ValueError,TypeError,AttributeError):self.send_error(400)
             def log_message(self,*args):pass
