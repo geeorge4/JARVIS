@@ -35,12 +35,21 @@ FIXED=['который час','какая дата','какой день нед
  'информация о компьютере','сколько оперативной памяти','заряд батареи',
  'открой диспетчер задач','открой сведения о системе','сделай скриншот',
  'открой папку скриншотов','запиши заметку купить молоко','покажи заметки',
- 'найди заметку молоко','поставь таймер на 5 минут','список таймеров','отмени таймеры',
+ 'найди заметку молоко','поставь таймер на 5 минут','список таймеров','отмени таймер 1','отмени таймеры',
  'найди в интернете Python','найди на ютубе музыка']
 CATALOG=([f'открой {n}' for n in SITES]+[f'открой {n}' for n in SETTINGS]+
          [f'открой папку {n}' for n in FOLDERS]+list(MEDIA)+FIXED)
 
 def norm(text):return re.sub(r'\s+',' ',text.lower().replace('ё','е')).strip(' .!?')
+
+TIMER_PART = re.compile(r'(\d+)\s*(секунд[аыу]?|сек|минут[ауы]?|мин|час(?:а|ов)?)')
+TIMER_UNITS = {'с': 1, 'м': 60, 'ч': 3600}
+TIMER_NUMBERS = {
+    'один': '1', 'одну': '1', 'одна': '1', 'два': '2', 'две': '2',
+    'три': '3', 'четыре': '4', 'пять': '5', 'шесть': '6', 'семь': '7',
+    'восемь': '8', 'девять': '9', 'десять': '10', 'пятнадцать': '15', 'тридцать': '30',
+}
+TIMER_NUMBER_WORD = re.compile(r'\b(?:' + '|'.join(TIMER_NUMBERS) + r')\b')
 
 class Extras:
     def __init__(self,notify):
@@ -54,7 +63,7 @@ class Extras:
     def recognized(self,text):
         s=norm(text)
         return (s in CATALOG or s in ('громкость выше','громкость ниже','дата','время','снимок экрана') or
-          s.startswith(('запиши заметку ','найди заметку ','поставь таймер ','таймер ',
+          s.startswith(('запиши заметку ','найди заметку ','поставь таймер ','таймер ','отмени таймер ',
                         'найди в интернете ','найди на ютубе ','поиск в интернете ')))
 
     def handle(self,text):
@@ -110,12 +119,19 @@ class Extras:
             query=text.strip()[len(prefix):].strip()
             webbrowser.open(('https://www.youtube.com/results?search_query=' if youtube else 'https://www.google.com/search?q=')+urllib.parse.quote_plus(query));return 'Открываю результаты поиска.'
         if s.startswith(('таймер ','поставь таймер ')):
-            numbers={'один':'1','одну':'1','одна':'1','два':'2','две':'2','три':'3','четыре':'4','пять':'5','шесть':'6','семь':'7','восемь':'8','девять':'9','десять':'10','пятнадцать':'15','тридцать':'30'}
-            for word,value in numbers.items():s=re.sub(r'\b'+word+r'\b',value,s)
-            match=re.fullmatch(r'(?:поставь )?таймер (?:на )?(\d+)\s*(секунд[аыу]?|сек|минут[ауы]?|мин|час(?:а|ов)?)',s)
-            if not match:return 'Пример: таймер 30 секунд, таймер 5 минут или таймер 1 час.'
-            amount=int(match.group(1));unit=match.group(2);seconds=amount*(3600 if unit.startswith('час') else 60 if unit.startswith('мин') else 1)
+            s = TIMER_NUMBER_WORD.sub(lambda match: TIMER_NUMBERS[match[0]], s)
+            duration = re.sub(r'^(?:поставь )?таймер (?:на )?', '', s)
+            if not re.fullmatch(rf'{TIMER_PART.pattern}(?:(?: и | ){TIMER_PART.pattern}){{0,2}}', duration):
+                return 'Пример: таймер 30 секунд или таймер 1 час 15 минут.'
+            parts = TIMER_PART.findall(duration)
+            if len({unit[0] for _, unit in parts}) != len(parts):
+                return 'Укажи часы, минуты и секунды по одному разу.'
+            parts = [(amount.lstrip('0') or '0', unit) for amount, unit in parts]
+            if any(len(amount) > 5 for amount, _ in parts):
+                return 'Таймер можно поставить от 1 секунды до 24 часов.'
+            seconds = sum(int(amount) * TIMER_UNITS[unit[0]] for amount, unit in parts)
             if not 1<=seconds<=86400:return 'Таймер можно поставить от 1 секунды до 24 часов.'
+            label = ' '.join(f'{int(amount)} {unit}' for amount, unit in parts)
             with self.lock:
                 if len(self.timers)>=20:return 'Уже работают 20 таймеров.'
                 identifier=self.next_id;self.next_id+=1
@@ -123,12 +139,21 @@ class Extras:
                     with self.lock:
                         if identifier not in self.timers:return
                         self.timers.pop(identifier)
-                    self.notify(f'Таймер {identifier} завершён: {amount} {unit}.')
+                    self.notify(f'Таймер {identifier} завершён: {label}.')
                 timer=threading.Timer(seconds,done);timer.daemon=True;self.timers[identifier]=(timer,time.monotonic()+seconds);timer.start()
-            return f'Таймер {identifier} поставлен на {amount} {unit}.'
+            return f'Таймер {identifier} поставлен на {label}.'
         if s=='список таймеров':
             with self.lock:return '\n'.join(f'{i}: осталось {max(0,int(end-time.monotonic()))} сек.' for i,(_,end) in self.timers.items()) or 'Активных таймеров нет.'
         if s=='отмени таймеры':self.close();return 'Все таймеры отменены.'
+        if s.startswith('отмени таймер '):
+            s = TIMER_NUMBER_WORD.sub(lambda match: TIMER_NUMBERS[match[0]], s)
+            number = re.fullmatch(r'отмени таймер (?:номер )?([0-9]{1,18})', s)
+            if number is None:
+                return 'Укажи номер из списка таймеров. Например: отмени таймер 2.'
+            identifier = int(number.group(1))
+            if self.cancel_timer(identifier):
+                return f'Таймер {identifier} отменён.'
+            return f'Активного таймера {identifier} нет.'
         return None
 
     def close(self):
