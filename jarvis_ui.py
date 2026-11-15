@@ -91,6 +91,8 @@ class App:
   self.wake_var=tk.BooleanVar(value=self.wake_enabled);self.sound_var=tk.BooleanVar(value=self.voice_output)
   tk.Checkbutton(settings,text='Активация словом Джарвис',variable=self.wake_var,command=self.sync_settings,bg='#121212',fg='#ddd',selectcolor='#333').pack(anchor='w',padx=30,pady=10)
   tk.Checkbutton(settings,text='Озвучивать ответы',variable=self.sound_var,command=self.sync_settings,bg='#121212',fg='#ddd',selectcolor='#333').pack(anchor='w',padx=30,pady=10)
+  self.chat_eco_var=tk.BooleanVar(value=prefs.get('chat_eco',False))
+  tk.Checkbutton(settings,text='Экономный режим чата',variable=self.chat_eco_var,command=self.save_chat_eco,bg='#121212',fg='#ddd',selectcolor='#333').pack(anchor='w',padx=30,pady=10)
   tk.Label(settings,text='Движок голоса',bg='#121212',fg='#ddd').pack(pady=5)
   self.voice_engine=tk.StringVar(value=prefs.get('voice_engine','xtts'))
   tk.OptionMenu(settings,self.voice_engine,'xtts','piper').pack()
@@ -410,6 +412,11 @@ class App:
   self.answer.configure(state='disabled')
  def update_wake_button(self):
   self.wake_button.configure(text='Фоновый микрофон: ВКЛ — выключить' if self.wake_enabled else 'Фоновый микрофон: ВЫКЛ — включить',fg='#9acba3' if self.wake_enabled else '#bbb')
+ def save_chat_eco(self):
+  try:product.save(chat_eco=self.chat_eco_var.get())
+  except OSError as exc:
+   self.chat_eco_var.set(product.load().get('chat_eco',False))
+   messagebox.showerror('Настройки',str(exc),parent=self.root)
  def sync_settings(self):
   self.wake_enabled=self.wake_var.get();self.voice_output=self.sound_var.get()
   if hasattr(self,"wake_button"):self.update_wake_button()

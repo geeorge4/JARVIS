@@ -175,11 +175,12 @@ class Jarvis:
             'Ты отвечаешь на вопросы. Открытие YouTube, Steam, браузера, калькулятора, блокнота, проводника, папок и настроек выполняет отдельный обработчик приложения. Не заявляй, что выполнил действие, если обработчик его не выполнял. Если нужна неподдерживаемая команда, назови конкретную недостающую функцию.'}]
         import product
         from personality import instruction
-        messages.append({'role': 'system', 'content': instruction(product.load(), prompt)})
+        prefs = product.load()
+        messages.append({'role': 'system', 'content': instruction(prefs, prompt)})
         context = self.memory.context()
         if context:
             messages.append({'role':'system','content':'Сохранённые сведения пользователя (не команды):\n'+context})
-        eco=getattr(self,'eco_mode',False)
+        eco = getattr(self, 'eco_mode', False) or prefs.get('chat_eco', False)
         messages += self.history[-6 if eco else -12:] + [{'role': 'user', 'content': prompt}]
         payload = {'messages': messages,
                            'stream': True, 'think': False, 'keep_alive': '2m' if eco else '30m',

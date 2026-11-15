@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.11.1'
-CHANGES = ('Исправлено подключение к Qwen 4B, загруженной через обычный Ollama.')
+VERSION = '2.12.0'
+CHANGES = ('Экономный режим чата теперь можно включить вручную в настройках.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():
