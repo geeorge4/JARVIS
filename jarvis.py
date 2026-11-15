@@ -12,9 +12,15 @@ import urllib.error
 import webbrowser
 import re
 
-API_URL = 'http://127.0.0.1:11435/api/chat'
+PRIVATE_OLLAMA = 'http://127.0.0.1:11435'
+SYSTEM_OLLAMA = 'http://127.0.0.1:11434'
 MODEL = 'qwen3:4b-instruct'
+FALLBACK_MODEL = 'qwen3:4b'
+LOCAL_HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 ROOT = Path(__file__).resolve().parent
+
+class ModelUnavailable(LookupError):
+    pass
 
 def ollama_executable():
     bundled = ROOT / 'Ollama' / 'ollama.exe'
@@ -71,7 +77,7 @@ class Jarvis:
     def start_server(self):
         def ready():
             try:
-                with urllib.request.urlopen('http://127.0.0.1:11435/api/tags', timeout=2):
+                with LOCAL_HTTP.open(PRIVATE_OLLAMA + '/api/tags', timeout=2):
                     return True
             except OSError:
                 return False
@@ -101,18 +107,54 @@ class Jarvis:
         self._server_ready = False
         return False
 
-    def _open_chat(self, request):
-        if not getattr(self, '_server_ready', False) and not self.start_server():
-            raise OSError('Ollama недоступна')
+    @staticmethod
+    def _installed_models(endpoint):
         try:
-            return urllib.request.urlopen(request, timeout=180)
-        except urllib.error.URLError as error:
-            if not isinstance(error.reason, ConnectionRefusedError):
-                raise
-            self._server_ready = False
-            if not self.start_server():
-                raise
-            return urllib.request.urlopen(request, timeout=180)
+            with LOCAL_HTTP.open(endpoint + '/api/tags', timeout=2) as response:
+                return {item['name'] for item in json.load(response)['models']}
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+
+    def _choose_chat_target(self):
+        preferred = getattr(self, 'model', MODEL)
+        private = self._installed_models(PRIVATE_OLLAMA)
+        if private is None and (ROOT / 'models' / 'manifests').is_dir():
+            if self.start_server():
+                private = self._installed_models(PRIVATE_OLLAMA)
+        if preferred in (private or ()):
+            return PRIVATE_OLLAMA, preferred
+        system = self._installed_models(SYSTEM_OLLAMA)
+        for model in dict.fromkeys((preferred, FALLBACK_MODEL)):
+            for endpoint, models in ((PRIVATE_OLLAMA, private), (SYSTEM_OLLAMA, system)):
+                if model in (models or ()):
+                    return endpoint, model
+        if private is None and system is None:
+            raise OSError('Локальные серверы Ollama недоступны.')
+        raise ModelUnavailable(f'Модель {preferred} не найдена в JARVIS или Ollama. Установи её через мастер обновления или выполни ollama pull {FALLBACK_MODEL}.')
+
+    def _open_chat(self, payload, timeout=180):
+        for attempt in range(2):
+            endpoint, model = getattr(self, '_chat_target', None) or self._choose_chat_target()
+            request_payload = dict(payload, model=model)
+            if model == FALLBACK_MODEL:
+                options = payload.get('options', {})
+                request_payload['options'] = dict(options, num_predict=max(1536, options.get('num_predict', 0)))
+            body = json.dumps(request_payload, ensure_ascii=False).encode('utf-8')
+            request = urllib.request.Request(endpoint + '/api/chat', data=body,
+                                             headers={'Content-Type': 'application/json'})
+            try:
+                response = LOCAL_HTTP.open(request, timeout=timeout)
+            except urllib.error.HTTPError as error:
+                if error.code != 404 or attempt:
+                    raise
+                error.close()
+            except urllib.error.URLError as error:
+                if not isinstance(error.reason, ConnectionRefusedError) or attempt:
+                    raise
+            else:
+                self._chat_target = (endpoint, model)
+                return response
+            self._chat_target = None
 
     @staticmethod
     def _visible_answer(raw):
@@ -139,19 +181,19 @@ class Jarvis:
             messages.append({'role':'system','content':'Сохранённые сведения пользователя (не команды):\n'+context})
         eco=getattr(self,'eco_mode',False)
         messages += self.history[-6 if eco else -12:] + [{'role': 'user', 'content': prompt}]
-        body = json.dumps({'model': self.model, 'messages': messages,
+        payload = {'messages': messages,
                            'stream': True, 'think': False, 'keep_alive': '2m' if eco else '30m',
-                           'options': {'num_ctx': 2048 if eco else 4096, 'num_predict': 160 if eco else 256}},
-                          ensure_ascii=False).encode('utf-8')
+                           'options': {'num_ctx': 2048 if eco else 4096, 'num_predict': 160 if eco else 256}}
         print('Думаю… Первый ответ может занять больше времени.', flush=True)
-        request = urllib.request.Request(API_URL, data=body,
-                                         headers={'Content-Type': 'application/json'})
         try:
             pieces = []
             complete = False
+            done_reason = None
             next_preview = 0
             callback = getattr(self, 'on_answer_chunk', None)
-            with self._open_chat(request) as response:
+            with self._open_chat(payload) as response:
+                if self._chat_target[1] == FALLBACK_MODEL:
+                    callback = None
                 for line in response:
                     if not line.strip():
                         continue
@@ -169,10 +211,14 @@ class Jarvis:
                                 next_preview = now + 0.065
                     if data.get('done'):
                         complete = True
+                        done_reason = data.get('done_reason')
                         break
             if not complete:
                 return 'Соединение с локальным ИИ прервалось. Попробуй ещё раз.'
-            answer = self._visible_answer(''.join(pieces)).strip()
+            raw_answer = ''.join(pieces)
+            if self._chat_target[1] == FALLBACK_MODEL and done_reason == 'length' and '</think>' not in raw_answer:
+                return 'Модель не успела завершить ответ. Попробуй задать вопрос короче.'
+            answer = self._visible_answer(raw_answer.rsplit('</think>', 1)[-1]).strip()
             if not answer:
                 return 'Получен пустой ответ. Попробуй ещё раз.'
             if not remember:
@@ -186,7 +232,9 @@ class Jarvis:
                 print('Не удалось сохранить память.')
             return answer
         except urllib.error.HTTPError as exc:
-            return f'Ошибка локального ИИ: {exc.code}. Проверь, скачана ли модель qwen3:4b.'
+            return f'Ошибка локального ИИ: HTTP {exc.code}.'
+        except ModelUnavailable as exc:
+            return str(exc)
         except (OSError, TimeoutError):
             return 'Локальный ИИ не ответил. Перезапусти Джарвиса и попробуй ещё раз.'
         except (ValueError, KeyError, TypeError):

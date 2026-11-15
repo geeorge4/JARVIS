@@ -3,7 +3,6 @@ import json
 import queue
 import threading
 import tkinter as tk
-import urllib.request
 from app_launcher import Launcher, ALIASES
 import workflows
 
@@ -17,17 +16,15 @@ def local_matches(text, names):
 
 def ai_matches(text, names):
     from jarvis import Jarvis
-    Jarvis.__new__(Jarvis).start_server()
-    payload = {'model':'qwen3:4b-instruct','stream':False,'format':'json',
+    payload = {'stream':False,'think':False,'format':'json',
         'keep_alive':'30m','options':{'num_ctx':4096,'num_predict':180},
         'messages':[{'role':'system','content':
         'Выбери до 5 приложений из списка под задачу пользователя. '
         'Не выполняй команды. Верни JSON {"apps":["точное название"]}. Список: '+json.dumps(names,ensure_ascii=False)},
         {'role':'user','content':text[:1000]}]}
-    req = urllib.request.Request('http://127.0.0.1:11435/api/chat',
-        data=json.dumps(payload).encode(), headers={'Content-Type':'application/json'})
-    with urllib.request.urlopen(req,timeout=90) as response: data=json.load(response)
-    result=json.loads(data['message']['content']).get('apps',[])
+    with Jarvis.__new__(Jarvis)._open_chat(payload, timeout=90) as response:
+        data = json.load(response)
+    result=json.loads(data['message']['content'].rsplit('</think>', 1)[-1]).get('apps',[])
     if not isinstance(result,list): return []
     return list(dict.fromkeys(n for n in result if isinstance(n,str) and n in names))[:5]
 

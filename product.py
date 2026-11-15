@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.11.0'
-CHANGES = ('В заметках появились копирование выбранной записи и экспорт всех записей в текстовый файл.')
+VERSION = '2.11.1'
+CHANGES = ('Исправлено подключение к Qwen 4B, загруженной через обычный Ollama.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():
