@@ -1,5 +1,8 @@
 """File workspace with explicit actions and read-only model requests."""
+import ctypes
 from dataclasses import dataclass
+import subprocess
+import sys
 import json
 import os
 from pathlib import Path
@@ -22,10 +25,28 @@ class FileQuestion:
                 json.dumps({'file': self.name, 'text': self.content}, ensure_ascii=False))
 
 
+def open_admin_work(root, folder):
+    install = Path(os.environ['ProgramFiles']) / 'JARVISASSISTENT'
+    script = install / 'work_mode.py'
+    python = install / 'Python' / 'pythonw.exe'
+    if Path(__file__).resolve() != script or not python.is_file():
+        raise OSError('Режим администратора доступен в установленной версии JARVIS.')
+    parameters = subprocess.list2cmdline(['-I', '-S', str(script), '--admin-work',
+                                           str(root), str(folder)])
+    shell_execute = ctypes.windll.shell32.ShellExecuteW
+    shell_execute.argtypes = (ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_wchar_p,
+                             ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_int)
+    shell_execute.restype = ctypes.c_void_p
+    result = shell_execute(None, 'runas', str(python), parameters, str(install), 1)
+    if (result or 0) <= 32:
+        raise OSError('Windows не открыла окно администратора. Проверь подтверждение UAC.')
+
+
 class Work:
-    def __init__(self, app, parent):
+    def __init__(self, app, parent, elevated=False):
         self.app = app
         self.parent = parent
+        self.elevated = elevated
         self.root = self.folder = None
         self.location = tk.StringVar(value='Выбери рабочую папку')
         app.heading(parent, 'JARVIS WORK', 'Открывай, редактируй и разбирай файлы выбранной папки.')
@@ -35,6 +56,8 @@ class Work:
                               ('Обновить', self.refresh), ('Новый файл', self.create_file),
                               ('Новая папка', self.create_folder)]:
             app.button(tools, label, lambda run=action: self.run(run)).pack(side='left')
+        if not elevated:
+            app.button(tools, 'Админ…', lambda: self.run(self.request_admin)).pack(side='left')
         tk.Label(parent, textvariable=self.location, anchor='w', bg='#121212', fg='#aaa',
                  wraplength=630).pack(fill='x', padx=16, pady=6)
         listing = tk.Frame(parent, bg='#121212')
@@ -54,6 +77,8 @@ class Work:
                               ('Спросить ИИ', self.ask), ('Переименовать', self.rename),
                               ('Копировать', self.copy), ('Переместить', self.move),
                               ('Удалить', self.delete)]
+        if elevated:
+            file_actions = [(label, action) for label, action in file_actions if action != self.ask]
         for index, (label, action) in enumerate(file_actions):
             app.button(actions, label, lambda run=action: self.run(run)).grid(
                 row=index//4, column=index%4, sticky='ew', padx=2, pady=2)
@@ -63,8 +88,24 @@ class Work:
     def run(self, action):
         try:
             action()
+        except PermissionError as error:
+            if not self.elevated and self.folder is not None and messagebox.askyesno(
+                    'Требуются права администратора',
+                    'Windows отказала в доступе. Открыть эту папку в окне администратора? '
+                    'После подтверждения повтори действие там.', parent=self.parent):
+                try:
+                    self.request_admin()
+                except OSError as launch_error:
+                    messagebox.showerror('JARVIS WORK', str(launch_error), parent=self.parent)
+            elif self.elevated:
+                messagebox.showerror('JARVIS WORK', str(error), parent=self.parent)
         except (OSError, ValueError) as error:
             messagebox.showerror('JARVIS WORK', str(error), parent=self.parent)
+
+    def request_admin(self):
+        if self.folder is None:
+            raise ValueError('Сначала выбери рабочую папку.')
+        open_admin_work(self.root, self.inside(self.folder))
 
     def inside(self, path):
         target = path.resolve()
@@ -108,6 +149,8 @@ class Work:
         if path.is_dir():
             self.folder = path
             self.refresh()
+        elif self.elevated:
+            self.edit_file(path)
         else:
             os.startfile(path)
 
@@ -245,3 +288,29 @@ class Work:
         output.pack(fill='both', expand=True)
         output.insert('1.0', answer)
         output.configure(state='disabled')
+
+
+class AdminWindow:
+    def button(self, parent, text, command):
+        return tk.Button(parent, text=text, command=command, bg='#282828', fg='white',
+                         relief='flat', padx=8, pady=5)
+
+    def heading(self, parent, title, subtitle):
+        tk.Label(parent, text=title + ' · Администратор', bg='#121212', fg='white',
+                 font=('Segoe UI', 19, 'bold')).pack(pady=(14, 4))
+        tk.Label(parent, text='Здесь изменения выполняются с правами администратора.',
+                 bg='#121212', fg='#aaa').pack(pady=(0, 10))
+
+
+if __name__ == '__main__' and len(sys.argv) == 4 and sys.argv[1] == '--admin-work':
+    if not ctypes.windll.shell32.IsUserAnAdmin():
+        sys.exit(1)
+    window = tk.Tk()
+    window.title('JARVIS WORK · Администратор')
+    window.geometry('830x520')
+    window.configure(bg='#121212')
+    panel = Work(AdminWindow(), window, elevated=True)
+    panel.root = Path(sys.argv[2]).resolve()
+    panel.folder = Path(sys.argv[3])
+    panel.run(panel.refresh)
+    window.mainloop()
