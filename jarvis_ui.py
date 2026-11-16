@@ -10,6 +10,7 @@ import workflows
 from extra_commands import CATALOG, Extras
 from workspace_panel import Workspace
 import windows_shell
+from work_mode import FileQuestion, Work
 DATA=Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'JARVISASSISTENT'/'phrases.json'
 PREFS=DATA.with_name('settings.json')
 ACTIONS=['что за гимн','история гимнов','повтори гимн','отчет сессии','покажи игровой журнал','завершить игровую сессию','проверь сбои Windows','анализ синего экрана','прочитай экран','объясни ошибку на экране','открой ютуб','открой Steam','открой браузер','открой калькулятор','открой блокнот','открой проводник','открой настройки','открой загрузки','открой документы']
@@ -34,12 +35,13 @@ class App:
   self.nav={};self.pages={}
   right=tk.Frame(shell,bg='#121212');right.pack(side='left',fill='both',expand=True)
   self.content=tk.Frame(right,bg='#121212');self.content.pack(fill='both',expand=True)
-  for name in ['Орб','Нейрочат','Рабочий стол','Команды','Конструктор','Настройки']:
+  for name in ['Орб','Нейрочат','Рабочий стол','JARVIS WORK','Команды','Конструктор','Настройки']:
    b=self.button(self.sidebar,name,lambda n=name:self.page(n));b.pack(fill='x',padx=10,pady=5,ipady=9);self.nav[name]=b
    self.pages[name]=tk.Frame(self.content,bg='#121212')
   self.lineups=None
   self.button(self.sidebar,'Раскидки CS2',lambda:self.open_lineups()).pack(fill='x',padx=10,pady=5,ipady=9)
   self.workspace=Workspace(self,self.pages['Рабочий стол'],DATA.with_name('notes.json'))
+  self.work=Work(self,self.pages['JARVIS WORK'])
   self.next_workspace_refresh=0
   self.canvas=tk.Canvas(self.pages['Орб'],bg='#121212',highlightthickness=0);self.canvas.pack(fill='both',expand=True)
   from orb_view import Orb
@@ -48,6 +50,7 @@ class App:
   tools=tk.Frame(chat,bg='#121212');tools.pack(pady=3)
   self.button(tools,'Копировать ответ',self.copy_answer).pack(side='left',padx=4)
   self.button(tools,'Сохранить переписку',self.export_chat).pack(side='left',padx=4)
+  self.button(tools,'Архив',self.open_archive).pack(side='left',padx=4)
   hints=tk.Frame(chat,bg='#121212');hints.pack(pady=8)
   for i,text in enumerate(['Объясни простыми словами','Помоги с текстом','Составь план на день','Разбери ошибку в коде']):
    self.button(hints,text,lambda t=text:self.prompt(t)).grid(row=i//2,column=i%2,padx=5,pady=5,ipady=7)
@@ -426,6 +429,23 @@ class App:
   try:product.save(wake_enabled=self.wake_enabled,voice_output=self.voice_output)
   except OSError as exc:messagebox.showerror('Настройки',str(exc),parent=self.root)
   if not self.voice_output and self.assistant and self.assistant.speech:self.assistant.speech.interrupt()
+ def open_archive(self):
+  from user_memory import Memory
+  from tkinter import simpledialog
+  query=simpledialog.askstring('Архив переписки','Слова для поиска. Пустое поле покажет весь архив.',parent=self.root)
+  if query is None:return
+  history=Memory().history
+  terms=query.casefold().split()
+  window=tk.Toplevel(self.root);window.title('Архив переписки');window.geometry('780x550')
+  scroll=tk.Scrollbar(window);scroll.pack(side='right',fill='y')
+  output=tk.Text(window,wrap='word',bg='#202020',fg='#eee',yscrollcommand=scroll.set)
+  output.pack(fill='both',expand=True)
+  scroll.configure(command=output.yview)
+  lines=[('Ты: ' if item['role']=='user' else 'Джарвис: ')+item['content']
+         for item in history if all(term in item['content'].casefold() for term in terms)]
+  output.insert('1.0','\n\n'.join(lines) if lines else 'Совпадений нет.')
+  output.configure(state='disabled')
+
  def clear_chat(self):
   self.answer.configure(state='normal');self.answer.delete('1.0','end');self.answer.configure(state='disabled');self.jobs.put((False,'__clear_history__'));self.find_chat()
  def forget_user(self):
@@ -528,7 +548,7 @@ class App:
    self.events.put(('answer',text))
    if self.voice_output and not self.game_mode:original(text)
   j.say=say
-  for item in j.history:self.events.put(('restore',('Ты: ' if item['role']=='user' else 'Джарвис: ')+item['content']))
+  for item in j.history[-40:]:self.events.put(('restore',('Ты: ' if item['role']=='user' else 'Джарвис: ')+item['content']))
   self.events.put(('ready','Готов. Скажи Джарвис или введи команду.'))
   while not self.closing:
    try:
@@ -560,6 +580,13 @@ class App:
      continue
    try:
     if j.speech:j.speech.stop_wake()
+    if isinstance(text,FileQuestion):
+     preview=j.on_answer_chunk
+     j.on_answer_chunk=None
+     j.eco_mode=self.guard_paused
+     try:self.events.put(('work_answer',j.ask(text.prompt(),remember=False)))
+     finally:j.on_answer_chunk=preview
+     continue
     if text=='__forget_user__':j.forget_user();continue
     if text=='__clear_history__':j.clear_history();continue
     if mic:
@@ -597,6 +624,7 @@ class App:
   try:
    while True:
     kind,text=self.events.get_nowait()
+    if kind=='work_answer':self.work.show_answer(text);continue
     if kind=='voice_error':self.status.set(text);self.transcript(text);continue
     if kind=='combat':
      was_critical=time.monotonic()<self.combat_until

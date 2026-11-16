@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.13.0'
-CHANGES = ('CS2: 200 вариантов реплик за киллы, по 15 за установку и обезвреживание бомбы.')
+VERSION = '2.14.0'
+CHANGES = ('Долгая память и поиск по архиву чата. JARVIS WORK открывает, редактирует и разбирает файлы выбранной папки.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():
