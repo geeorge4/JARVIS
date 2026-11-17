@@ -166,7 +166,7 @@ class Jarvis:
             return answer.lstrip() if separator else ''
         return text
 
-    def ask(self, prompt, remember=True):
+    def ask(self, prompt, remember=True, json_mode=False):
         if remember:
             self.memory.remember(prompt)
         messages = [{'role': 'system', 'content':
@@ -188,6 +188,9 @@ class Jarvis:
         payload = {'messages': messages,
                            'stream': True, 'think': False, 'keep_alive': '2m' if eco else '30m',
                            'options': {'num_ctx': 2048 if eco else 4096, 'num_predict': 160 if eco else 256}}
+        if json_mode:
+            payload['format'] = 'json'
+            payload['options']['num_predict'] = 768
         print('Думаю… Первый ответ может занять больше времени.', flush=True)
         try:
             pieces = []

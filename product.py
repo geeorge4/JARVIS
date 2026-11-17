@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.14.1'
-CHANGES = ('JARVIS WORK предлагает отдельное окно с правами администратора, если Windows запрещает файловую операцию.')
+VERSION = '2.15.0'
+CHANGES = ('JARVIS WORK понимает текстовые запросы к файлам. Изменения выполняются после подтверждения.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():

@@ -10,7 +10,7 @@ import workflows
 from extra_commands import CATALOG, Extras
 from workspace_panel import Workspace
 import windows_shell
-from work_mode import FileQuestion, Work
+from work_mode import FileQuestion, FileTask, Work
 DATA=Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'JARVISASSISTENT'/'phrases.json'
 PREFS=DATA.with_name('settings.json')
 ACTIONS=['что за гимн','история гимнов','повтори гимн','отчет сессии','покажи игровой журнал','завершить игровую сессию','проверь сбои Windows','анализ синего экрана','прочитай экран','объясни ошибку на экране','открой ютуб','открой Steam','открой браузер','открой калькулятор','открой блокнот','открой проводник','открой настройки','открой загрузки','открой документы']
@@ -580,11 +580,14 @@ class App:
      continue
    try:
     if j.speech:j.speech.stop_wake()
-    if isinstance(text,FileQuestion):
+    if isinstance(text,(FileQuestion,FileTask)):
      preview=j.on_answer_chunk
      j.on_answer_chunk=None
      j.eco_mode=self.guard_paused
-     try:self.events.put(('work_answer',j.ask(text.prompt(),remember=False)))
+     try:
+      answer=j.ask(text.prompt(),remember=False,json_mode=isinstance(text,FileTask))
+      if isinstance(text,FileTask):self.events.put(('work_task',(text,answer)))
+      else:self.events.put(('work_answer',answer))
      finally:j.on_answer_chunk=preview
      continue
     if text=='__forget_user__':j.forget_user();continue
@@ -624,6 +627,7 @@ class App:
   try:
    while True:
     kind,text=self.events.get_nowait()
+    if kind=='work_task':self.work.receive_task(*text);continue
     if kind=='work_answer':self.work.show_answer(text);continue
     if kind=='voice_error':self.status.set(text);self.transcript(text);continue
     if kind=='combat':
