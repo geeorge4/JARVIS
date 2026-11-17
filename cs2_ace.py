@@ -86,7 +86,7 @@ class AceServer:
                     match=matches.update(data)
                     won_round=wins.update(data)
                     if match and match_callback:match_callback()
-                    elif won_round and data.get('map',{}).get('phase')!='gameover' and win_callback:win_callback()
+                    elif won_round and win_callback:win_callback()
                     ace=detector.update(data)
                     comment=commentator.update(data,quiet=False)
                     if kill_callback and isinstance(comment,list):

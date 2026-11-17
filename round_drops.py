@@ -13,27 +13,67 @@ _ace_generation=0
 _recent_music=deque(maxlen=10)
 _last_clip=None
 _play_lock=threading.Lock()
+ROUND_MODES = ('competitive', 'scrimcomp2v2', 'casual', 'retake', 'retakes')
+MATCH_MODES = ('competitive', 'scrimcomp2v2', 'casual')
+
+
 class RoundWins:
-    def __init__(self):self.last=None;self.seen=set()
-    def update(self,data):
-        game=data.get('map',{});player=data.get('player',{});provider=data.get('provider',{});round_=data.get('round',{})
-        if str(provider.get('appid'))!='730' or not provider.get('steamid') or player.get('steamid')!=provider.get('steamid'):return False
-        team=player.get('team')
-        if team not in ('CT','T') or game.get('phase') not in ('live','gameover'):return False
-        if game.get('mode') not in ('competitive','scrimcomp2v2','casual'):return False
-        scores=tuple(game.get('team_'+side.lower(),{}).get('score') for side in ('CT','T'))
-        current=(game.get('name'),player.get('steamid'),team,scores,round_.get('phase'),game.get('round'))
-        old=self.last;self.last=current
-        if not old or old[:3]!=current[:3]:return False
-        index=0 if team=='CT' else 1
-        scored=(all(isinstance(v,int) for v in scores+old[3]) and scores[index]==old[3][index]+1 and scores[1-index]==old[3][1-index])
-        ended=round_.get('phase')=='over' and old[4] in ('live','freezetime') and round_.get('win_team')==team
-        if not (scored or ended):return False
-        # Scores identify a completed round even when map.round changes in the over packet.
-        key=(current[0],current[1],sum(scores)) if all(isinstance(v,int) for v in scores) else (current[0],current[1],old[5] if ended else current[5])
-        if key in self.seen:return False
-        if len(self.seen)>256:self.seen.clear()
-        self.seen.add(key);return True
+    def __init__(self):
+        self.last = None
+        self.last_win = None
+
+    def update(self, data):
+        game = data.get('map', {})
+        player = data.get('player', {})
+        provider = data.get('provider', {})
+        round_ = data.get('round', {})
+        steamid = provider.get('steamid')
+        if str(provider.get('appid')) != '730' or not steamid:
+            return False
+        if game.get('phase') == 'warmup' or player.get('activity') == 'menu':
+            self.last = self.last_win = None
+            return False
+        team = player.get('team')
+        if player.get('steamid') != steamid or team not in ('CT', 'T'):
+            return False
+        if game.get('phase') not in ('live', 'gameover') or game.get('mode') not in ROUND_MODES:
+            return False
+
+        scores = tuple(game.get('team_' + side, {}).get('score') for side in ('ct', 't'))
+        key = (game.get('name'), steamid)
+        phase = round_.get('phase')
+        number = game.get('round')
+        previous = self.last
+        self.last = (key, team, scores, phase, number)
+        if previous is None or previous[:2] != (key, team):
+            self.last_win = None
+            return False
+        old_scores, old_phase, old_number = previous[2:]
+        scored = False
+        total = None
+        if all(isinstance(value, int) for value in scores + old_scores):
+            total = sum(scores)
+            if total < sum(old_scores):
+                self.last_win = None
+                return False
+            index = 0 if team == 'CT' else 1
+            scored = scores[index] == old_scores[index] + 1 and scores[1-index] == old_scores[1-index]
+        ended = phase == 'over' and old_phase in ('live', 'freezetime') and round_.get('win_team') == team
+        if not scored and not ended:
+            return False
+        # An over packet may arrive before its winning score. Anticipate that score for deduplication.
+        if ended and total is not None and total == sum(old_scores):
+            total += 1
+        round_id = old_number if ended else number
+        if self.last_win is not None:
+            old_total, last_round = self.last_win
+            if total is not None and old_total is not None and total == old_total:
+                return False
+            if (total is None or old_total is None) and round_id == last_round:
+                return False
+        self.last_win = (total, round_id)
+        return True
+
 
 def play():
     global _last_clip,_music_until
@@ -68,7 +108,7 @@ class MatchWins:
         if key!=self.key or game.get('phase')=='warmup':
             self.key=key;self.armed=False;self.fired=False;self.team=None;self.mode=None;self.finished=False
         if game.get('mode'):self.mode=game['mode']
-        if self.mode not in ('competitive','scrimcomp2v2','casual'):return False
+        if self.mode not in MATCH_MODES:return False
         if player.get('steamid')==provider['steamid'] and player.get('team') in ('CT','T'):
             self.team=player['team']
         if game.get('phase')=='live':
