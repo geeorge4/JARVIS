@@ -21,6 +21,9 @@ class RoundWins:
     def __init__(self):
         self.last = None
         self.last_win = None
+        self.identity = None
+        self.team = None
+        self.mode = None
 
     def update(self, data):
         game = data.get('map', {})
@@ -30,13 +33,22 @@ class RoundWins:
         steamid = provider.get('steamid')
         if str(provider.get('appid')) != '730' or not steamid:
             return False
-        if game.get('phase') == 'warmup' or player.get('activity') == 'menu':
+        key = (game.get('name'), steamid)
+        local_player = player.get('steamid') == steamid
+        if self.identity != key or game.get('phase') == 'warmup' or (
+                local_player and player.get('activity') == 'menu'):
             self.last = self.last_win = None
+            self.identity = key
+            self.team = None
+            self.mode = None
+        if game.get('mode'):
+            self.mode = game['mode']
+        if local_player and player.get('team') in ('CT', 'T'):
+            self.team = player['team']
+        team = self.team
+        if team not in ('CT', 'T'):
             return False
-        team = player.get('team')
-        if player.get('steamid') != steamid or team not in ('CT', 'T'):
-            return False
-        if game.get('phase') not in ('live', 'gameover') or game.get('mode') not in ROUND_MODES:
+        if game.get('phase') not in ('live', 'gameover') or self.mode not in ROUND_MODES:
             return False
 
         scores = tuple(game.get('team_' + side, {}).get('score') for side in ('ct', 't'))
@@ -101,8 +113,7 @@ class MatchWins:
     def update(self,data):
         game=data.get('map',{});player=data.get('player',{});provider=data.get('provider',{})
         if str(provider.get('appid'))!='730' or not provider.get('steamid'):return False
-        # End-of-match scoreboard packets may omit player/team. Never adopt a spectator's team.
-        if player.get('steamid') not in (None,provider.get('steamid')):return False
+        # Retain the last known local team when the packet describes a spectated player.
         if not game.get('name'):return False
         key=(game['name'],provider['steamid'])
         if key!=self.key or game.get('phase')=='warmup':

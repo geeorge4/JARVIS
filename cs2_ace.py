@@ -64,6 +64,8 @@ class Detector:
 class AceServer:
     def __init__(self,callback,port=PORT,secret=None,comment_callback=None,state_callback=None,win_callback=None,match_callback=None,kill_callback=None):
         self.last_received=0;self.last_summary={}
+        self.state_lock=threading.Lock()
+        self.round_wins=0;self.match_wins=0;self.diagnostic_key=None
         owner=self
         self.detector=Detector();secret=secret or token();detector=self.detector
         from game_commentator import Commentator
@@ -82,21 +84,38 @@ class AceServer:
                     if not isinstance(supplied,str) or not hmac.compare_digest(supplied,secret):self.send_error(403);return
                     owner.last_received=time.monotonic()
                     owner.last_summary={'phase':data.get('round',{}).get('phase'),'mode':data.get('map',{}).get('mode'),'local_player':data.get('player',{}).get('steamid')==data.get('provider',{}).get('steamid')}
-                    if state_callback:state_callback(data)
-                    match=matches.update(data)
-                    won_round=wins.update(data)
-                    if match and match_callback:match_callback()
-                    elif won_round and win_callback:win_callback()
-                    ace=detector.update(data)
-                    comment=commentator.update(data,quiet=False)
-                    if kill_callback and isinstance(comment,list):
-                        for event in comment:
-                            if event.get('type')=='kill':kill_callback()
-                    if ace:callback(PHRASE)
-                    if comment and comment_callback:
-                        for event in (comment if isinstance(comment,list) else [comment]):
-                            if not ace or (isinstance(event,dict) and event.get('type') in ('planted','defused')):
-                                comment_callback(event)
+                    with owner.state_lock:
+                        if state_callback:state_callback(data)
+                        match=matches.update(data)
+                        won_round=wins.update(data)
+                        if match and match_callback:match_callback()
+                        elif won_round and win_callback:win_callback()
+                        owner.round_wins += int(won_round)
+                        owner.match_wins += int(match)
+                        owner.last_summary.update(map_phase=data.get('map',{}).get('phase'),
+                            round_number=data.get('map',{}).get('round'),
+                            local_team=wins.team, round_wins=owner.round_wins, match_wins=owner.match_wins,
+                            win_team=data.get('round',{}).get('win_team'))
+                        diagnostic_key=tuple(str(owner.last_summary.get(key)) for key in
+                            ('phase','mode','map_phase','round_number','local_player','local_team','round_wins','match_wins'))
+                        if diagnostic_key!=owner.diagnostic_key:
+                            owner.diagnostic_key=diagnostic_key
+                            try:
+                                target=TOKEN_PATH.with_name('cs2-status.json')
+                                temporary=target.with_suffix('.tmp')
+                                temporary.write_text(json.dumps(owner.last_summary,ensure_ascii=False),encoding='utf-8')
+                                temporary.replace(target)
+                            except OSError:pass
+                        ace=detector.update(data)
+                        comment=commentator.update(data,quiet=False)
+                        if kill_callback and isinstance(comment,list):
+                            for event in comment:
+                                if event.get('type')=='kill':kill_callback()
+                        if ace:callback(PHRASE)
+                        if comment and comment_callback:
+                            for event in (comment if isinstance(comment,list) else [comment]):
+                                if not ace or (isinstance(event,dict) and event.get('type') in ('planted','defused')):
+                                    comment_callback(event)
                     self.send_response(200);self.end_headers();self.wfile.write(b'OK')
                 except (ValueError,TypeError,AttributeError):self.send_error(400)
             def log_message(self,*args):pass

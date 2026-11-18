@@ -5,8 +5,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-VERSION = '2.15.1'
-CHANGES = ('Исправлено распознавание побед в повторных матчах на той же карте. Добавлены гимны раунда в Retakes и резервный гимн последнего раунда.')
+VERSION = '2.15.2'
+CHANGES = ('Гимны CS2 учитывают победы, когда после смерти показан другой игрок. Команда берётся из последних данных самого пользователя. Добавлена диагностика событий.')
 PREFS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'JARVISASSISTENT' / 'settings.json'
 
 def load():
